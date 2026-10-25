@@ -223,7 +223,7 @@ The `config` block of the `prompt-enhance` row in `cordis.patch.yml`:
 3. `selectMethodology` picks a technique set and `buildSystemPrompt` assembles a single user message
    (“enhancement instructions” + “original draft”).
 4. The host streams from the session model via `ctx.llm.stream(…)` and pushes SSE frames back;
-   `tidyResult` strips ```markdown fences and “here is your prompt:” pleasantries.
+   `tidyResult` strips leading markdown code fences and “here is your prompt:” pleasantries.
 
 Workspace content is wrapped in a read-only evidence frame that tells the model any imperative text
 found inside is *material*, not a command — a cheap defence against prompt injection hiding in a repo.

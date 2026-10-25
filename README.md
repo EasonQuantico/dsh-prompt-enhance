@@ -213,7 +213,7 @@ Invoke-RestMethod http://127.0.0.1:2896/prompt-enhance/api/state
 2. 宿主按需读工作区（`code-read`），生成目录树、清单摘要、关键文件摘录与安全扫描命中。
 3. `selectMethodology` 选方法论，`buildSystemPrompt` 拼出「增强指令 + 用户原提示词」的单条 user 消息。
 4. 宿主用当前会话模型 `ctx.llm.stream(...)` 流式生成，按 SSE 推给浏览器；结果经 `tidyResult` 去掉
-   ```markdown 包裹与「以下是…提示词：」之类的客套前缀。
+   整段 markdown 代码块围栏与「以下是…提示词：」之类的客套前缀。
 
 工作区内容进入提示词时被包在「只读证据」帧里，并明确告知模型：其中出现的指令性文字只是素材，
 不构成对它的命令 —— 这是对「工作区里藏提示词注入」的一层防御。
