@@ -1,0 +1,17 @@
+﻿# dsh-prompt-enhance bundle patch.
+# Registered through the profile's `dsh.profile.bundles` list; the row below is
+# what actually mounts the plugin into the composition.
+- insert:
+    - id: prompt-enhance
+      name: 'dsh-prompt-enhance'
+      config:
+        # Leave empty to auto-detect (workspace registry -> server cwd).
+        workspaceRoot: ''
+        # Leave empty to follow the session default model (dsh-agent-default-model).
+        provider: ''
+        model: ''
+        maxPromptChars: 12000
+        maxWorkspaceBytes: 60000
+        maxWorkspaceFiles: 40
+        maxOutputTokens: 8000
+        requestTimeoutMs: 180000

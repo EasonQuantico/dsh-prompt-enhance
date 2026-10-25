@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Logs and local scratch output
+*.log
+npm-debug.log*
+.npm/
+coverage/
+.tmp/
+tmp/
+
+# Test-run leftovers
+test/.fixtures-*/**
+
+# Editor and OS noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

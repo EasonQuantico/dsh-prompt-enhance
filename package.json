@@ -1,0 +1,76 @@
+{
+  "name": "dsh-prompt-enhance",
+  "version": "1.0.0",
+  "description": "DSH plugin: turn a rough draft in the chat composer into an executable prompt. Code mode reads the workspace and audits security; creative mode enriches or structures scripts. Methodologies adapt between Superpowers, Prompt Optimizer, LangGPT and AiShort.",
+  "type": "module",
+  "license": "MIT",
+  "author": "EasonQuantico",
+  "homepage": "https://github.com/EasonQuantico/dsh-prompt-enhance#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EasonQuantico/dsh-prompt-enhance.git"
+  },
+  "bugs": {
+    "url": "https://github.com/EasonQuantico/dsh-prompt-enhance/issues"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "cordis",
+    "plugin",
+    "prompt",
+    "prompt-engineering",
+    "prompt-optimization",
+    "prompt-enhancement",
+    "coding-agent",
+    "superpowers",
+    "langgpt",
+    "aishort",
+    "prompt-optimizer"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./strategies": "./strategies.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "strategies.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "README.en.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "CONTRACT.md",
+    "CHANGELOG.md",
+    "SECURITY.md",
+    "CONTRIBUTING.md",
+    "docs/research/*.md",
+    "docs/research/*.mjs"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "check": "node --check index.js && node --check client.js && node --check strategies.js",
+    "test": "node --test test/*.test.mjs",
+    "verify": "npm run check && npm test"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  }
+}
