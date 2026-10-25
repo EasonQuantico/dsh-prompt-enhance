@@ -196,7 +196,7 @@ export const METHODOLOGIES = [
     id: "prompt-optimizer",
     label: "Prompt Optimizer",
     source: "https://github.com/linshenkx/prompt-optimizer",
-    license: "unknown",
+    license: "NOASSERTION（未标注）",
     summary: "Prompt Optimizer：开源提示词优化器，用分析式结构优化与迭代模板把口语化需求重写成结构化提示词，并原样保留变量占位符。",
     principles: [
       "先诊断原提示词的问题，再给结构化重写",
