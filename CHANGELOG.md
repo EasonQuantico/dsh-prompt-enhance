@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Docs
+
+- README (both languages) now leads with six illustrations: three UI mockups drawn from
+  `client.js` (button, panel, result) and three diagrams (request chain, methodology scoring
+  matrix, workspace evidence). Generators live in `docs/images/`; the mockups are labelled as
+  mockups, not screenshots.
+
 ## [1.0.0] — 2026-10-25
 
 First public release.

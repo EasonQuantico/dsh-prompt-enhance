@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 566" width="1180" height="566" role="img">
+<style>
+  text { font-family: 'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',system-ui,sans-serif; }
+  .mono { font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+  .title { fill: #eceef1; font-size: 21px; font-weight: 600; }
+  .sub { fill: #7f8690; font-size: 13px; }
+  .label { fill: #7f8690; font-size: 11.5px; letter-spacing: .04em; }
+  .h { fill: #eceef1; font-size: 15px; font-weight: 600; }
+  .b { fill: #aeb4bd; font-size: 12.5px; }
+  .b2 { fill: #7f8690; font-size: 12px; }
+  .n { fill: #ffffff; font-size: 12px; font-weight: 600; }
+  .card { fill: #1b1d21; stroke: #3a3e46; }
+  .soft { fill: #23262b; stroke: #2b2f36; }
+</style>
+<rect width="1180" height="566" rx="16" fill="#111214"/>
+<text x="44" y="52" class="title" text-anchor="start">方法论自适应：四种方式 × 四套手法</text>
+<text x="44" y="78" class="sub" text-anchor="start">基础分 0.2；提示词命中方法论关键词每次 +0.6（最多 3 次）；再按增强方式做场景加权</text>
+<text x="384.0" y="132" class="b" text-anchor="middle">Superpowers</text>
+<text x="600.0" y="132" class="b" text-anchor="middle">Prompt Optimizer</text>
+<text x="816.0" y="132" class="b" text-anchor="middle">LangGPT</text>
+<text x="1032.0" y="132" class="b" text-anchor="middle">AiShort</text>
+<text x="52" y="132" class="label" text-anchor="start">增强方式</text>
+<text x="52" y="181.0" class="h" text-anchor="start">读取工作区后优化</text>
+<text x="52" y="201.0" class="mono b2" text-anchor="start">code-read</text>
+<rect x="279" y="150" width="208" height="54" rx="10" fill="#5884ff" stroke="#2b2f36" stroke-width="1"/>
+<text x="383.0" y="183.0" class="h" text-anchor="middle" fill="#eceef1">+1.6</text>
+<rect x="279" y="150" width="208" height="54" rx="10" fill="none" stroke="#5884ff" stroke-width="2"/>
+<rect x="495" y="150" width="208" height="54" rx="10" fill="#3d58a1" stroke="#2b2f36" stroke-width="1"/>
+<text x="599.0" y="183.0" class="h" text-anchor="middle" fill="#eceef1">+0.9</text>
+<rect x="711" y="150" width="208" height="54" rx="10" fill="#16181c" stroke="#2b2f36" stroke-width="1"/>
+<text x="815.0" y="183.0" class="h" text-anchor="middle" fill="#7f8690">—</text>
+<rect x="927" y="150" width="208" height="54" rx="10" fill="#16181c" stroke="#2b2f36" stroke-width="1"/>
+<text x="1031.0" y="183.0" class="h" text-anchor="middle" fill="#7f8690">—</text>
+<text x="52" y="247.0" class="h" text-anchor="start">仅按提示词优化</text>
+<text x="52" y="267.0" class="mono b2" text-anchor="start">code-only</text>
+<rect x="279" y="216" width="208" height="54" rx="10" fill="#2e3f6b" stroke="#2b2f36" stroke-width="1"/>
+<text x="383.0" y="249.0" class="h" text-anchor="middle" fill="#eceef1">+0.5</text>
+<rect x="495" y="216" width="208" height="54" rx="10" fill="#5077e4" stroke="#2b2f36" stroke-width="1"/>
+<text x="599.0" y="249.0" class="h" text-anchor="middle" fill="#eceef1">+1.4</text>
+<rect x="495" y="216" width="208" height="54" rx="10" fill="none" stroke="#5884ff" stroke-width="2"/>
+<rect x="711" y="216" width="208" height="54" rx="10" fill="#4464bc" stroke="#2b2f36" stroke-width="1"/>
+<text x="815.0" y="249.0" class="h" text-anchor="middle" fill="#eceef1">+1.1</text>
+<rect x="927" y="216" width="208" height="54" rx="10" fill="#16181c" stroke="#2b2f36" stroke-width="1"/>
+<text x="1031.0" y="249.0" class="h" text-anchor="middle" fill="#7f8690">—</text>
+<text x="52" y="313.0" class="h" text-anchor="start">补充丰富型</text>
+<text x="52" y="333.0" class="mono b2" text-anchor="start">creative-rich</text>
+<rect x="279" y="282" width="208" height="54" rx="10" fill="#354b86" stroke="#2b2f36" stroke-width="1"/>
+<text x="383.0" y="315.0" class="h" text-anchor="middle" fill="#eceef1">+0.7</text>
+<rect x="495" y="282" width="208" height="54" rx="10" fill="#16181c" stroke="#2b2f36" stroke-width="1"/>
+<text x="599.0" y="315.0" class="h" text-anchor="middle" fill="#7f8690">—</text>
+<rect x="711" y="282" width="208" height="54" rx="10" fill="#547df1" stroke="#2b2f36" stroke-width="1"/>
+<text x="815.0" y="315.0" class="h" text-anchor="middle" fill="#eceef1">+1.5</text>
+<rect x="711" y="282" width="208" height="54" rx="10" fill="none" stroke="#5884ff" stroke-width="2"/>
+<rect x="927" y="282" width="208" height="54" rx="10" fill="#314579" stroke="#2b2f36" stroke-width="1"/>
+<text x="1031.0" y="315.0" class="h" text-anchor="middle" fill="#eceef1">+0.6</text>
+<text x="52" y="379.0" class="h" text-anchor="start">结构严谨型</text>
+<text x="52" y="399.0" class="mono b2" text-anchor="start">creative-structure</text>
+<rect x="279" y="348" width="208" height="54" rx="10" fill="#5077e4" stroke="#2b2f36" stroke-width="1"/>
+<text x="383.0" y="381.0" class="h" text-anchor="middle" fill="#eceef1">+1.4</text>
+<rect x="279" y="348" width="208" height="54" rx="10" fill="none" stroke="#5884ff" stroke-width="2"/>
+<rect x="495" y="348" width="208" height="54" rx="10" fill="#16181c" stroke="#2b2f36" stroke-width="1"/>
+<text x="599.0" y="381.0" class="h" text-anchor="middle" fill="#7f8690">—</text>
+<rect x="711" y="348" width="208" height="54" rx="10" fill="#4464bc" stroke="#2b2f36" stroke-width="1"/>
+<text x="815.0" y="381.0" class="h" text-anchor="middle" fill="#eceef1">+1.1</text>
+<rect x="927" y="348" width="208" height="54" rx="10" fill="#16181c" stroke="#2b2f36" stroke-width="1"/>
+<text x="1031.0" y="381.0" class="h" text-anchor="middle" fill="#7f8690">—</text>
+<circle cx="51" cy="440" r="5" fill="#5884ff"/>
+<text x="64" y="444" class="b" text-anchor="start">蓝框 = auto 实测选中：superpower · prompt-optimizer · langgpt · superpower</text>
+<rect x="44" y="462" width="46" height="22" rx="8" class="soft"/>
+<text x="67" y="478" class="mono b" text-anchor="middle">+0.8</text>
+<text x="104" y="478" class="b2" text-anchor="start">code-read 且勾选「审查安全性」时 prompt-optimizer 再加权</text>
+<rect x="44" y="488" width="46" height="22" rx="8" class="soft"/>
+<text x="67" y="504" class="mono b" text-anchor="middle">+1.0</text>
+<text x="104" y="504" class="b2" text-anchor="start">结构严谨型命中「剧本 / 大纲 / 分集 / 分镜」时 superpower 再加权</text>
+<rect x="44" y="514" width="46" height="22" rx="8" class="soft"/>
+<text x="67" y="530" class="mono b" text-anchor="middle">+0.8</text>
+<text x="104" y="530" class="b2" text-anchor="start">创作类命中「角色 / 人物 / 世界观」时 langgpt 再加权</text>
+</svg>

@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 486" width="1440" height="486" role="img">
+<style>
+  text { font-family: 'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',system-ui,sans-serif; }
+  .mono { font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+  .title { fill: #eceef1; font-size: 21px; font-weight: 600; }
+  .sub { fill: #7f8690; font-size: 13px; }
+  .label { fill: #7f8690; font-size: 11.5px; letter-spacing: .04em; }
+  .h { fill: #eceef1; font-size: 15px; font-weight: 600; }
+  .b { fill: #aeb4bd; font-size: 12.5px; }
+  .b2 { fill: #7f8690; font-size: 12px; }
+  .n { fill: #ffffff; font-size: 12px; font-weight: 600; }
+  .card { fill: #1b1d21; stroke: #3a3e46; }
+  .soft { fill: #23262b; stroke: #2b2f36; }
+</style>
+<rect width="1440" height="486" rx="16" fill="#111214"/>
+<text x="44" y="52" class="title" text-anchor="start">一次增强的完整链路</text>
+<text x="44" y="78" class="sub" text-anchor="start">浏览器半只负责选类型与回填；宿主半负责证据、路由与流式输出</text>
+<rect x="44" y="106" width="252" height="142" rx="14" class="card"/>
+<circle cx="68" cy="132" r="11" fill="#5884ff"/><text x="68" y="136.2" class="n" text-anchor="middle">1</text>
+<text x="88" y="137" class="h" text-anchor="start">输入框草稿</text>
+<text x="64" y="168" class="b2" text-anchor="start">右侧控件行的 ✨ 按钮</text>
+<text x="64" y="190" class="b2" text-anchor="start">选 代码 / 创作</text>
+<text x="64" y="212" class="b2" text-anchor="start">再选四种方式之一</text>
+<rect x="328" y="106" width="252" height="142" rx="14" class="card"/>
+<circle cx="352" cy="132" r="11" fill="#5884ff"/><text x="352" y="136.2" class="n" text-anchor="middle">2</text>
+<text x="372" y="137" class="h" text-anchor="start">POST /enhance</text>
+<text x="348" y="168" class="b2" text-anchor="start">三道闸：loopback</text>
+<text x="348" y="190" class="mono b2" text-anchor="start">same-origin</text>
+<text x="348" y="212" class="mono b2" text-anchor="start">application/json</text>
+<rect x="612" y="106" width="252" height="142" rx="14" class="card"/>
+<circle cx="636" cy="132" r="11" fill="#5884ff"/><text x="636" y="136.2" class="n" text-anchor="middle">3</text>
+<text x="656" y="137" class="h" text-anchor="start">证据装配</text>
+<text x="632" y="168" class="b2" text-anchor="start">目录树 + 10 个文件摘录</text>
+<text x="632" y="190" class="b2" text-anchor="start">安全扫描命中</text>
+<text x="632" y="212" class="b2" text-anchor="start">方法论打分 auto</text>
+<rect x="896" y="106" width="252" height="142" rx="14" class="card"/>
+<circle cx="920" cy="132" r="11" fill="#5884ff"/><text x="920" y="136.2" class="n" text-anchor="middle">4</text>
+<text x="940" y="137" class="h" text-anchor="start">ctx.llm.stream</text>
+<text x="916" y="168" class="b2" text-anchor="start">单条 user 消息</text>
+<text x="916" y="190" class="b2" text-anchor="start">增强指令 + 原提示词</text>
+<text x="916" y="212" class="b2" text-anchor="start">工作区证据帧定</text>
+<rect x="1180" y="106" width="252" height="142" rx="14" class="card"/>
+<circle cx="1204" cy="132" r="11" fill="#5884ff"/><text x="1204" y="136.2" class="n" text-anchor="middle">5</text>
+<text x="1224" y="137" class="h" text-anchor="start">SSE 流式回填</text>
+<text x="1200" y="168" class="mono b2" text-anchor="start">meta · status · delta</text>
+<text x="1200" y="190" class="mono b2" text-anchor="start">done / error</text>
+<text x="1200" y="212" class="b2" text-anchor="start">替换 / 插入 / 复制</text>
+<line x1="302" y1="177.0" x2="315" y2="177.0" stroke="#3a3e46" stroke-width="1.5" /><path d="M314 172.0 L322 177.0 L314 182.0" fill="none" stroke="#3a3e46" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="586" y1="177.0" x2="599" y2="177.0" stroke="#3a3e46" stroke-width="1.5" /><path d="M598 172.0 L606 177.0 L598 182.0" fill="none" stroke="#3a3e46" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="870" y1="177.0" x2="883" y2="177.0" stroke="#3a3e46" stroke-width="1.5" /><path d="M882 172.0 L890 177.0 L882 182.0" fill="none" stroke="#3a3e46" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="1154" y1="177.0" x2="1167" y2="177.0" stroke="#3a3e46" stroke-width="1.5" /><path d="M1166 172.0 L1174 177.0 L1166 182.0" fill="none" stroke="#3a3e46" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="44" y="266" width="252" height="26" rx="13" class="soft"/>
+<text x="170.0" y="283.5" class="b2" text-anchor="middle">浏览器（client.js）</text>
+<rect x="328" y="266" width="820" height="26" rx="13" class="soft"/>
+<text x="738.0" y="283.5" class="b2" text-anchor="middle">宿主（index.js）</text>
+<rect x="1180" y="266" width="252" height="26" rx="13" class="soft"/>
+<text x="1306.0" y="283.5" class="b2" text-anchor="middle">浏览器（client.js）</text>
+<rect x="44" y="310" width="1388" height="104" rx="14" class="card"/>
+<circle cx="72.0" cy="338" r="4" fill="#5884ff"/>
+<text x="84.0" y="343" class="h" text-anchor="start">只读证据</text>
+<text x="84.0" y="366" class="b2" text-anchor="start">工作区只读：不写文件、不执行代码</text>
+<text x="84.0" y="386" class="b2" text-anchor="start">跳过二进制与锁文件</text>
+<circle cx="530.6666666666667" cy="338" r="4" fill="#5884ff"/>
+<text x="542.6666666666667" y="343" class="h" text-anchor="start">不自动发送</text>
+<text x="542.6666666666667" y="366" class="b2" text-anchor="start">结果只回填草稿，可继续编辑</text>
+<text x="542.6666666666667" y="386" class="b2" text-anchor="start">断流可随时停止</text>
+<circle cx="989.3333333333334" cy="338" r="4" fill="#5884ff"/>
+<text x="1001.3333333333334" y="343" class="h" text-anchor="start">可追溯</text>
+<text x="1001.3333333333334" y="366" class="b2" text-anchor="start">meta 里带模型 / 方法论 / 文件数 / 命中数</text>
+<text x="1001.3333333333334" y="386" class="b2" text-anchor="start">10s 工作区缓存</text>
+<text x="44" y="450" class="label" text-anchor="start">上限：maxPromptChars 12000 · maxWorkspaceBytes 60000 · maxOutputTokens 8000 · 请求超时 180s</text>
+</svg>

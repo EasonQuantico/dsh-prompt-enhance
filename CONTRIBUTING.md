@@ -38,6 +38,7 @@ patch wins.
 | `cordis.patch.yml` | Bundle insert row and default config |
 | `CONTRACT.md` | Internal contract between the two halves (events, payloads, guards) |
 | `docs/research/` | Provenance notes for the four methodologies (not loaded at runtime) |
+| `docs/images/` | README mockups and diagrams plus their generator scripts (not loaded at runtime) |
 | `test/` | `node:test` suites, no fixtures on disk |
 
 ## Rules of the road
@@ -53,6 +54,10 @@ These come from the DSH plugin guide and are not negotiable:
   prefix; no hard-coded palettes, no global selectors.
 - **Keep the contract honest.** If you change an event name, payload field or guard,
   update `CONTRACT.md` and `test/host.test.mjs` in the same commit.
+- **Keep the pictures honest.** `docs/images/` holds mockups drawn from `client.js`, not
+  screenshots. If you rename a label or reorder the panel, regenerate them
+  (`python3 docs/images/generate-mockups.py`) and keep the ①②③ callouts in both READMEs
+  aligned — see [docs/images/README.md](docs/images/README.md).
 - **No new dependencies** without discussing it first; the CI matrix is dependency-free
   on purpose.
 

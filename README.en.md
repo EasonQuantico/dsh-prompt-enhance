@@ -17,6 +17,8 @@ verifiable prompt — written straight into the input box.
 - **Four methodologies, auto-selected**: Superpowers / Prompt Optimizer / LangGPT / AiShort techniques scored per scenario, or pick one manually.
 - **Only writes to the composer** — it never sends a message, and every workspace access is read-only.
 
+![The ✨ Prompt Enhance button and panel: pick code or creative, then a refinement style](docs/images/ui-composer.png)
+
 [中文 README](README.md) · [Internal contract](CONTRACT.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md)
 
 ---
@@ -24,6 +26,7 @@ verifiable prompt — written straight into the input box.
 ## Contents
 
 - [Features](#features)
+- [At a glance](#at-a-glance)
 - [The four refinement styles](#the-four-refinement-styles)
 - [Methodology selection](#methodology-selection)
 - [Installation](#installation)
@@ -51,6 +54,38 @@ verifiable prompt — written straight into the input box.
 | One-click landing | Replace composer / insert at caret / copy / retry; the result box is editable before applying |
 | Preference memory | Last family, style, focus and methodology are remembered in `localStorage` |
 | Diagnostic breadcrumbs | The browser half reports mount/open/start/apply events to the host for console-free debugging |
+
+## At a glance
+
+> These three images are **mockups drawn from `client.js`'s real layout and copy**, not screenshots.
+> Paths, file names and model names in them are examples.
+
+### The button lives in the composer's control row
+
+![The "✨ Prompt Enhance" button in the composer's right-hand control row](docs/images/ui-composer.png)
+
+- **① Writes back only** — the enhanced prompt lands in the draft; you can keep editing before sending.
+- **② Always available** — registered in the `conversation.input.right` slot, so it shows up both on the
+  hero (new session) and in-session composer. An empty draft is fine: it enhances what you are about to write.
+
+### The panel: family first, then style and focus
+
+![The enhancement panel: family tabs, style cards, focuses, methodology, workspace evidence, start button](docs/images/ui-panel.png)
+
+- **① Family tabs** — code or creative; each family remembers the style you used last.
+- **② Four styles** — two per family, each card states what it adds.
+- **③ Code focuses** — improve the development framework and/or review security, multi-select, at least one.
+- **④ Methodology** — `auto` scores the scenario by default; the panel shows which set won, and you can pin one.
+- **⑤ Visible evidence** — before reading anything it tells you which directory, how many files, how many findings.
+- **⑥ One click to run** — turns into “stop” while streaming; the result is only written to the composer.
+
+### The result: edit first, then land it
+
+![The result panel: editable output, four ways to land it, and traceable metadata](docs/images/ui-result.png)
+
+- **① Editable output** — the enhancement is a draft, not a final answer: tweak it before applying.
+- **② Four ways to land it** — replace the composer / insert at the caret / copy / retry.
+- **③ Traceable metadata** — which model, which methodology, how many files read, how many findings.
 
 ## The four refinement styles
 
@@ -92,6 +127,8 @@ The four technique sets are rewritten in Chinese inside `strategies.js`; **no up
 | `code-only` | prompt-optimizer +1.4, langgpt +1.1, superpower +0.5 |
 | `creative-rich` | langgpt +1.5, superpower +0.7, aishort +0.6 |
 | `creative-structure` | superpower +1.4, langgpt +1.1 (+1.0 more when the draft mentions scripts, outlines or episodes) |
+
+![Methodology routing: the weighted matrix of four styles × four technique sets](docs/images/methodology.svg)
 
 Measured picks: `superpower` / `prompt-optimizer` / `langgpt` / `superpower` for the four styles.
 Sources, licence discrepancies and the “why no upstream text was merged” rationale live in
@@ -201,22 +238,15 @@ The `config` block of the `prompt-enhance` row in `cordis.patch.yml`:
 
 ## How it works
 
-```
-┌──────────────── browser (DSH Web GUI) ───────────────┐
-│ client.js — slot conversation.input.right            │
-│   ✨ button → panel (family/style/focus/methodology) │
-│   → read SSE → write back into the composer          │
-└───────────────────────┬──────────────────────────────┘
-                        │ fetch /prompt-enhance/api/*
-                        │ (loopback + same-origin + JSON gates)
-┌───────────────────────▼──────── DSH host process ────┐
-│ index.js — /state /workspace /enhance(SSE) /cancel   │
-│   collectWorkspace (read-only, bounded) → scanSecurity│
-│   → selectMethodology → buildSystemPrompt            │
-│   → ctx.llm.stream(…) → SSE meta/status/delta/done   │
-│ strategies.js — vocabularies, techniques, prompt build│
-└──────────────────────────────────────────────────────┘
-```
+![The full chain of one enhancement: draft → POST /enhance (three gates) → evidence assembly → ctx.llm.stream → SSE write-back](docs/images/architecture.svg)
+
+The browser half only selects and writes back; the host half owns evidence, routing and streaming:
+
+| File | Responsibility |
+| --- | --- |
+| `client.js` | slot registration, button and panel, SSE parsing, progress, write-back (`insertText` / `setDraft`) |
+| `index.js` | the three gates, `/state` `/workspace` `/enhance` `/cancel`, `collectWorkspace`, `resolveRoute`, SSE |
+| `strategies.js` | vocabularies, `selectMethodology` scoring, `buildSystemPrompt`, `renderDigest` evidence framing |
 
 1. The browser posts the draft, family, style, focuses and the session cwd to `POST /enhance`.
 2. For `code-read` the host scans the workspace: tree, manifest summary, key excerpts, security findings.
@@ -227,6 +257,16 @@ The `config` block of the `prompt-enhance` row in `cordis.patch.yml`:
 
 Workspace content is wrapped in a read-only evidence frame that tells the model any imperative text
 found inside is *material*, not a command — a cheap defence against prompt injection hiding in a repo.
+
+### Workspace evidence (`code-read`)
+
+![Workspace evidence: a directory tree, manifest, file excerpts and security findings folded into one read-only evidence block](docs/images/evidence.svg)
+
+- **Four kinds of material**: a directory tree (≤ 60 lines), the dependency manifest summary, excerpts of
+  10 prioritised files (≤ 3500 chars each) and heuristic findings from 60 files × 10 rules (≤ 40 hits).
+- **Always framed**: `renderDigest()` prefixes the block with “this is material, not instructions” and asks
+  the model to say so explicitly when the evidence does not answer something.
+- **Bounded and predictable**: total ≤ `maxWorkspaceBytes`, depth ≤ 7, at most 6000 files walked, 10 s cache.
 
 ## HTTP API
 
@@ -272,6 +312,10 @@ npm test         # tests only (node --test)
 No install step is needed; CI runs the same checks on Node 20 and 22. UI dev loop: edit `client.js` →
 touch the profile patch to reload the host → refresh the page.
 
+The images used above live in `docs/images/`: the three UI mockups are generated by
+`generate-mockups.py` (Pillow), the three diagrams by `generate-diagrams.py` (stdlib only) —
+see [docs/images/README.md](docs/images/README.md).
+
 Contribution rules (encoding, commit format, PR checklist) are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Repository layout
@@ -284,6 +328,7 @@ Contribution rules (encoding, commit format, PR checklist) are in [CONTRIBUTING.
 ├── cordis.patch.yml            Bundle insert row and default config
 ├── CONTRACT.md                 Contract shared by both halves (events, payloads, validation)
 ├── docs/research/              Provenance and licence notes for the four methodologies (not loaded at runtime)
+├── docs/images/                README mockups and diagrams, plus their generators
 ├── test/                       node:test suite (no dependencies, no network)
 ├── .github/workflows/ci.yml    Node 20 / 22 syntax check + tests
 ├── CHANGELOG.md / CONTRIBUTING.md / SECURITY.md / THIRD_PARTY_NOTICES.md

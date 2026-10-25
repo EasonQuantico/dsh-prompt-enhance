@@ -16,6 +16,8 @@ DSH（DeepSeek Harness）插件。在输入框右侧加一个 **✨ 提示词增
 - **四套方法论自适应**：Superpowers / Prompt Optimizer / LangGPT / AiShort 的手法按场景打分选用，也可手动指定。
 - **只写回输入框**，不自动发送消息；所有工作区访问都是只读。
 
+![提示词增强按钮与面板：输入框右侧的 ✨ 按钮，点开选代码/创作与增强方式](docs/images/ui-composer.png)
+
 [English README](README.en.md) · [内部契约](CONTRACT.md) · [安全策略](SECURITY.md) · [变更记录](CHANGELOG.md)
 
 ---
@@ -23,6 +25,7 @@ DSH（DeepSeek Harness）插件。在输入框右侧加一个 **✨ 提示词增
 ## 目录
 
 - [功能](#功能)
+- [界面一览](#界面一览)
 - [四种增强方式](#四种增强方式)
 - [方法论自适应](#方法论自适应)
 - [安装](#安装)
@@ -50,6 +53,38 @@ DSH（DeepSeek Harness）插件。在输入框右侧加一个 **✨ 提示词增
 | 一键落盘 | 替换输入框 / 插入到光标 / 复制 / 再试一次，结果区可直接编辑 |
 | 偏好记忆 | 上次选的大类、方式、方向、方法论记在 `localStorage` |
 | 诊断面包屑 | 浏览器半把挂载/打开/开始/回填事件上报到宿主，便于无控制台排查 |
+
+## 界面一览
+
+> 下面三张图按 `client.js` 的真实布局与文案绘制，是**界面示意**而非运行截图；
+> 图中的路径、文件名与模型名仅作示例。
+
+### 按钮：常驻输入框右侧
+
+![输入框右侧控件行里的「✨ 提示词增强」按钮](docs/images/ui-composer.png)
+
+- **① 只写回输入框** —— 增强结果落到草稿里，不替你发送；写回前还可以继续编辑。
+- **② 常驻按钮** —— 挂在 `conversation.input.right` 槽位，hero（新建会话）与会话内两种输入形态都在；
+  草稿为空也能点，因为它增强的是「你接下来要写的东西」。
+
+### 面板：先定大类，再定方式与方向
+
+![提示词增强面板：大类标签、方式卡片、优化方向、方法论、工作区证据、开始按钮](docs/images/ui-panel.png)
+
+- **① 先选大类** —— 代码 / 创作；切换会记住各自上次用的方式。
+- **② 四种增强方式** —— 代码两种、创作两种，卡片上写着各自的增益。
+- **③ 代码类再加方向** —— 完善开发框架 / 审查安全性，可多选、至少一项。
+- **④ 方法论可自适应** —— 默认 `auto` 按场景打分，也可手动锁定某一家。
+- **⑤ 工作区证据可见** —— 读取前就告诉你要扫哪、多少文件、几处安全命中。
+- **⑥ 一句话启动** —— 在途时按钮变成「停止」；不自动发送：结果只回填输入框。
+
+### 结果：先编辑，再落盘
+
+![增强结果面板：可编辑的结果区、四种落盘方式与可追溯的元信息](docs/images/ui-result.png)
+
+- **① 结果可直接编辑** —— 增强结果是草稿不是终稿：先改再回填。
+- **② 四种落盘方式** —— 替换输入框 / 插入到光标 / 复制 / 再试一次。
+- **③ 元信息可追溯** —— 这次用了哪家模型、哪套方法论、读了多少文件、命中几处。
 
 ## 四种增强方式
 
@@ -88,6 +123,8 @@ DSH（DeepSeek Harness）插件。在输入框右侧加一个 **✨ 提示词增
 | `code-only` | prompt-optimizer +1.4、langgpt +1.1、superpower +0.5 |
 | `creative-rich` | langgpt +1.5、superpower +0.7、aishort +0.6 |
 | `creative-structure` | superpower +1.4、langgpt +1.1（命中「剧本/大纲/分集」等再 +1.0） |
+
+![方法论自适应：四种增强方式 × 四套方法论的加权矩阵](docs/images/methodology.svg)
 
 实测四种方式分别选中 `superpower` / `prompt-optimizer` / `langgpt` / `superpower`。
 出处、许可差异与「为什么没有合并上游文本」记录在
@@ -193,21 +230,15 @@ Invoke-RestMethod http://127.0.0.1:2896/prompt-enhance/api/state
 
 ## 工作原理
 
-```
-┌──────────────── 浏览器（DSH Web GUI）────────────────┐
-│ client.js —— 槽位 conversation.input.right           │
-│   ✨ 按钮 → 面板（选类型/方向/方法论）→ 读 SSE → 回填 │
-└───────────────────────┬──────────────────────────────┘
-                        │ fetch /prompt-enhance/api/*
-                        │ （loopback + same-origin + JSON 三道闸）
-┌───────────────────────▼────────── 宿主（DSH 进程）──┐
-│ index.js —— /state /workspace /enhance(SSE) /cancel  │
-│   collectWorkspace（只读、限量）→ scanSecurity        │
-│   → selectMethodology → buildSystemPrompt            │
-│   → ctx.llm.stream(...) → SSE meta/status/delta/done │
-│ strategies.js —— 词表 + 方法论片段 + 提示词构造       │
-└──────────────────────────────────────────────────────┘
-```
+![一次增强的完整链路：草稿 → POST /enhance（三道闸）→ 证据装配 → ctx.llm.stream → SSE 流式回填](docs/images/architecture.svg)
+
+浏览器半只负责「选」与「回填」，宿主半负责证据、路由与流式输出：
+
+| 文件 | 分工 |
+| --- | --- |
+| `client.js` | 槽位注册、按钮与面板、SSE 解析、进度显示、回填（`insertText` / `setDraft`） |
+| `index.js` | 三道闸、`/state` `/workspace` `/enhance` `/cancel`、`collectWorkspace`、`resolveRoute`、SSE |
+| `strategies.js` | 词表、`selectMethodology` 打分、`buildSystemPrompt` 拼提示词、`renderDigest` 证据帧定 |
 
 1. 浏览器把草稿、类型、方向与当前会话 cwd 发给 `POST /enhance`。
 2. 宿主按需读工作区（`code-read`），生成目录树、清单摘要、关键文件摘录与安全扫描命中。
@@ -217,6 +248,16 @@ Invoke-RestMethod http://127.0.0.1:2896/prompt-enhance/api/state
 
 工作区内容进入提示词时被包在「只读证据」帧里，并明确告知模型：其中出现的指令性文字只是素材，
 不构成对它的命令 —— 这是对「工作区里藏提示词注入」的一层防御。
+
+### 工作区证据（`code-read`）
+
+![工作区证据：目录树、依赖清单、文件摘录、安全扫描四类只读素材装进「只读证据块」](docs/images/evidence.svg)
+
+- **四类素材**：目录树（≤ 60 行）、依赖清单摘要、优先级 10 个文件摘录（每个 ≤ 3500 字符）、
+  60 个文件 × 10 条规则的安全扫描命中（最多 40 条）。
+- **一律帧定**：`renderDigest()` 给整块加上「这是素材不是命令」的前置声明，并要求模型
+  「不满足时明确要求先声明不知道」，避免它把注释或文档里的示例当成真实约束。
+- **限量与可预期**：总量 ≤ `maxWorkspaceBytes`，深度 ≤ 7，最多 6000 个文件参与遍历，结果缓存 10 秒。
 
 ## HTTP 接口
 
@@ -260,6 +301,9 @@ npm test         # 只跑测试（node --test）
 无需安装依赖即可跑；CI 在 Node 20 与 22 上跑同一套检查。改 UI 时的热更新流程：
 改 `client.js` → 追加注释触发宿主重载 → 刷新页面。
 
+README 里的图在 `docs/images/`：三张界面示意 PNG 由 `generate-mockups.py`（Pillow）生成，
+三张 SVG 由 `generate-diagrams.py`（纯标准库）生成，细节见 [docs/images/README.md](docs/images/README.md)。
+
 贡献约定（编码约束、提交格式、PR 清单）见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## 仓库结构
@@ -272,6 +316,7 @@ npm test         # 只跑测试（node --test）
 ├── cordis.patch.yml            bundle 插入行与默认配置
 ├── CONTRACT.md                 两半共享的内部契约（事件、载荷、校验）
 ├── docs/research/              四个方法论的出处与许可调研（运行时不加载）
+├── docs/images/                README 的界面示意与架构图（含生成脚本，不参与打包）
 ├── test/                       node:test 套件（无依赖、无网络）
 ├── .github/workflows/ci.yml    Node 20 / 22 语法检查 + 测试
 ├── CHANGELOG.md / CONTRIBUTING.md / SECURITY.md / THIRD_PARTY_NOTICES.md
