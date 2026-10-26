@@ -43,7 +43,7 @@ window.__ModuleLoader__.load({
       documentAuto: '自动挑选（相关性优先）',
       documentNone: '未找到可读文档',
       documentMissing: '当前工作区没有可读文档：请选一个文件，或改用「按类型起草」。',
-      documentChars: (n) => `${n} 字`,
+      documentChars: (n, truncated) => (truncated ? `${n} 字（已截断）` : `${n} 字`),
       documentHeadings: (n) => `${n} 个标题`,
       documentRefresh: '刷新文档',
       documentOutline: '框架',
@@ -1001,7 +1001,7 @@ window.__ModuleLoader__.load({
                 ? h(
                     'div',
                     null,
-                    `${LABELS.documentChars(selectedDocument.chars)} · ${LABELS.documentHeadings(selectedDocument.headings)}`,
+                    `${LABELS.documentChars(selectedDocument.chars, selectedDocument.truncated)} · ${LABELS.documentHeadings(selectedDocument.headings)}`,
                     selectedDocument.outline && selectedDocument.outline.length
                       ? h(
                           'div',
@@ -1063,7 +1063,9 @@ window.__ModuleLoader__.load({
               wantsWorkspace ? h('span', null, `${LABELS.metaFiles} ${meta.workspaceScanned || 0}`) : null,
               wantsWorkspace ? h('span', null, `${LABELS.metaSecurity} ${meta.securityFindings || 0}`) : null,
               wantsDocument ? h('span', null, `${LABELS.metaDocument} ${meta.documentPath || '—'}`) : null,
-              wantsDocument && meta.documentChars ? h('span', null, LABELS.documentChars(meta.documentChars)) : null,
+              wantsDocument && meta.documentChars
+                ? h('span', null, LABELS.documentChars(meta.documentChars, meta.documentTruncated))
+                : null,
               wantsDocument && meta.documentHeadings ? h('span', null, LABELS.documentHeadings(meta.documentHeadings)) : null,
             )
           : null
@@ -1195,7 +1197,7 @@ window.__ModuleLoader__.load({
     return {
       inject: ['slots'],
       apply(ctx) {
-        beat('client-apply', 'v1.1.0')
+        beat('client-apply', 'v1.1.1')
         ctx.slots.inject('conversation.input.right', () =>
           ctx.slots.register(
             { name: 'conversation.input.right', id: 'prompt-enhance-trigger', order: 20 },

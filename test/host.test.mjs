@@ -674,6 +674,26 @@ test('/documents honours an explicit path and ignores paths outside the workspac
   }
 })
 
+test('/documents reports the full length and marks a truncated excerpt', async () => {
+  const root = await makeFixture()
+  try {
+    const long = '# fixture\n\n' + '补写内容。'.repeat(60) + '\n'
+    await writeFile(join(root, 'README.md'), long)
+    const { handler } = mount({ projects: null, config: { maxDocumentChars: 40 } })
+    const body = (await call(handler, {
+      url: `/prompt-enhance/api/documents?cwd=${encodeURIComponent(root)}`,
+    })).json()
+
+    assert.equal(body.selected.truncated, true)
+    assert.equal(body.selected.chars, long.length)
+    // The listing reads up to 20000 chars for scoring, so a 300-char file is not truncated there.
+    assert.equal(body.documents[0].truncated, false)
+    assert.equal(body.documents[0].chars, long.length)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 /* ------------------------------------------------------------------ */
 /* /enhance doc mode                                                  */
 /* ------------------------------------------------------------------ */
@@ -709,6 +729,7 @@ test('/enhance doc-fill reads the document and frames it as evidence', async () 
     assert.equal(meta.documentPath, 'docs/guide.md')
     assert.ok(meta.documentChars > 0)
     assert.equal(meta.documentHeadings, 3)
+    assert.equal(meta.documentTruncated, false)
     // Document digests are not workspace scans.
     assert.equal(meta.workspaceFiles, 0)
     assert.equal(meta.securityFindings, 0)

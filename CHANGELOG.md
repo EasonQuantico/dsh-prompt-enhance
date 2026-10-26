@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.1.1] — 2026-10-26
+
+### Fixed
+
+- `/documents` and the `meta` event reported the whole file length while the model only
+  received an excerpt capped by `maxDocumentChars`. The length is now always the real file
+  length, `truncated` is reported for both the listing and the selected document (plus
+  `documentTruncated` in `meta`), and the panel labels a shortened excerpt with
+  「（已截断）」. Heading outline and formatting traits are still computed from the whole file.
+
+### Changed
+
+- The candidate picker's first option reads `自动挑选（相关性优先）`: ranking weights prompt
+  relevance more than recency.
+- `SECURITY.md` spells out the document-specific checks (root confinement, text-only
+  extensions, `maxDocumentChars`) and no longer calls the plugin pre-1.0.
+
 ## [1.1.0] — 2026-10-26
 
 Third family, documentation mode.

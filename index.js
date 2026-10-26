@@ -21,7 +21,7 @@ import {
   selectMethodology,
 } from './strategies.js'
 
-export const VERSION = '1.1.0'
+export const VERSION = '1.1.1'
 /** `llm` is required for the enhance route; `webServer` is injected locally below. */
 export const inject = ['llm']
 const ROUTE_PREFIX = '/prompt-enhance/api'
@@ -490,7 +490,8 @@ async function readDocumentText(fullPath, maxChars) {
     const chars = text.length
     const truncated = chars > maxChars
     return {
-      text: truncated ? `${text.slice(0, maxChars)}\n…（已截断 ${chars - maxChars} 字符）` : text,
+      text,
+      excerpt: truncated ? `${text.slice(0, maxChars)}\n…（已截断 ${chars - maxChars} 字符）` : text,
       chars,
       truncated,
     }
@@ -533,13 +534,14 @@ async function listDocuments(root, prompt, limit = 24) {
   scored.sort((a, b) => b.score - a.score || b.mtimeMs - a.mtimeMs)
   const documents = []
   for (const item of scored.slice(0, limit)) {
-    const text = await readText(join(root, item.rel), 20000)
-    if (!text) continue
+    const document = await readDocumentText(join(root, item.rel), 20000)
+    if (!document) continue
     documents.push({
       path: item.rel,
-      chars: text.length,
-      lines: text.split('\n').length,
-      headings: extractHeadings(text, extname(item.rel).toLowerCase()).length,
+      chars: document.chars,
+      truncated: document.truncated,
+      lines: document.text.split('\n').length,
+      headings: extractHeadings(document.text, extname(item.rel).toLowerCase()).length,
       modified: new Date(item.mtimeMs).toISOString(),
       score: Number(item.score.toFixed(2)),
     })
@@ -579,7 +581,7 @@ async function collectDocument(root, { docPath, prompt, limits }) {
     lines: document.text.split('\n').length,
     headings: headings.slice(0, 120),
     format,
-    text: document.text,
+    text: document.excerpt,
     truncated: document.truncated,
     candidates: listed.documents.slice(0, 8).map(({ path, chars }) => ({ path, chars })),
   }
@@ -967,6 +969,7 @@ async function handleEnhance(ctx, state, request, response) {
     documentPath: documentInfo ? documentInfo.path : '',
     documentChars: documentInfo ? documentInfo.chars : 0,
     documentHeadings: documentInfo ? documentInfo.headings : 0,
+    documentTruncated: documentInfo ? Boolean(documentInfo.truncated) : false,
     startedAt: Date.now(),
   })
 

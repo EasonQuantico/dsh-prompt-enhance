@@ -65,7 +65,7 @@ so every write must be guarded by loopback + same-origin + JSON content-type che
 ```json
 {
   "ok": true,
-  "version": "1.1.0",
+  "version": "1.1.1",
   "provider": "workbuddy2api-hub",
   "model": "deepseek-v4.1-flash",
   "modelSource": "session-default",
@@ -137,6 +137,8 @@ Lists the readable documents of the workspace and outlines the one that would be
 `cwd` has the same meaning as on `/workspace`. `prompt` (≤240 chars) steers the ranking;
 `path` pins one document (workspace-relative or absolute inside the root). `refresh=1`
 bypasses the 10 s cache. Only text formats are listed — `.docx`/`.pdf` are not parsed.
+`chars` is the length of the whole file; `truncated` says whether the excerpt sent to the
+model hit `maxDocumentChars`.
 
 ```json
 {
@@ -147,7 +149,7 @@ bypasses the 10 s cache. Only text formats are listed — `.docx`/`.pdf` are not
   "requested": "",
   "total": 61,
   "documents": [
-    { "path": "prompt-enhance/README.md", "chars": 11340, "headings": 27, "score": 3.2, "modifiedAt": 1761 }
+    { "path": "prompt-enhance/README.md", "chars": 11340, "truncated": false, "headings": 27, "score": 3.2, "modifiedAt": 1761 }
   ],
   "selected": {
     "path": "prompt-enhance/README.md",
@@ -193,7 +195,7 @@ Events (each `data:` line is one JSON object; a `: ping` comment is sent every 1
 
 | event | data |
 | --- | --- |
-| `meta` | `{ provider, model, modelSource, promptChars, mode, variant, focus, methodology, methodologyLabel, methodologyReason, workspaceRoot, workspaceSource, workspaceFiles, workspaceScanned, securityFindings, documentPath, documentChars, documentHeadings, startedAt }` |
+| `meta` | `{ provider, model, modelSource, promptChars, mode, variant, focus, methodology, methodologyLabel, methodologyReason, workspaceRoot, workspaceSource, workspaceFiles, workspaceScanned, securityFindings, documentPath, documentChars, documentHeadings, documentTruncated, startedAt }` |
 | `status` | `{ stage: "reasoning", chars }` (throttled to one per ~1.2 s) or `{ stage: "text", chars: 0 }` on the first visible token |
 | `delta` | `{ text }` |
 | `done` | `{ text, usage, finish, durationMs, truncated }` |
@@ -247,9 +249,9 @@ UI requirements:
    - Methodology select (`auto` first) with the hint text.
    - Workspace preview line for `code-read`: file count + "预览/刷新" that calls the
      workspace endpoint and shows the first few paths.
-   - Document line for `doc-fill`: selected path + 「N 字 · N 个标题」 + the first outline
-     entries, a candidate `<select>` (`自动挑选（最近修改）` first) that re-reads
-     `/documents`, and a `刷新文档` button.
+   - Document line for `doc-fill`: selected path + 「N 字 · N 个标题」 (add 「（已截断）」
+     when `truncated`) + the first outline entries, a candidate `<select>`
+     (`自动挑选（相关性优先）` first) that re-reads `/documents`, and a `刷新文档` button.
    - Primary `开始增强` button; while running a `停止` button plus streaming text.
    - Result step: editable textarea with the enhanced prompt and
      `替换输入框` (`setDraft`), `插入到光标` (`insertText` with the span captured at
