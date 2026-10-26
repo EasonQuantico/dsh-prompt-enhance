@@ -8,13 +8,14 @@
 [![Dependencies](https://img.shields.io/badge/runtime%20deps-none-brightgreen.svg)](package.json)
 
 A plugin for DSH (DeepSeek Harness). It adds a **✨ Prompt Enhance** button to the right of the
-composer: pick *code* or *creative*, pick a refinement style, and the plugin reads your workspace
-(optionally), selects a prompt-engineering methodology, and streams back a structured, executable,
-verifiable prompt — written straight into the input box.
+composer: pick *code*, *creative* or *documentation*, pick a refinement style and a length, and the
+plugin reads your workspace (optionally), selects a prompt-engineering methodology, and streams back a
+structured, executable, verifiable prompt — written straight into the input box.
 
 - **Zero runtime dependencies**, no build step, drop it into a profile and go.
 - **Reads real code**: `code-read` scans the workspace tree, key files and the dependency manifest before rewriting.
 - **Four methodologies, auto-selected**: Superpowers / Prompt Optimizer / LangGPT / AiShort techniques scored per scenario, or pick one manually.
+- **Three lengths**: concise / default / thorough — three lines or a full structure with acceptance criteria, from the same request.
 - **Only writes to the composer** — it never sends a message, and every workspace access is read-only.
 
 ![The ✨ Prompt Enhance button and panel: pick code, creative or documentation, then a refinement style](docs/images/ui-composer.png)
@@ -28,6 +29,7 @@ verifiable prompt — written straight into the input box.
 - [Features](#features)
 - [At a glance](#at-a-glance)
 - [The six refinement styles](#the-six-refinement-styles)
+- [Depth: three lengths](#depth-three-lengths)
 - [Methodology selection](#methodology-selection)
 - [Installation](#installation)
 - [Usage](#usage)
@@ -48,6 +50,7 @@ verifiable prompt — written straight into the input box.
 | Persistent button | A pill button in the composer's right-hand control row, present in both the hero and in-session composer |
 | Three families, six styles | Code (read the workspace / prompt-only), creative (enrich / tighten the structure) and documentation (fill in an existing document / draft from a template) |
 | Two code focuses | "Improve the development framework" and "Review security", multi-select, at least one |
+| Three lengths | Concise / default / thorough: a character budget per request, scaled per methodology by measured length |
 | Methodology routing | Four upstream techniques plus `auto` scoring; a dropdown pins one if you disagree |
 | Workspace evidence | Directory tree, manifest summary, prioritised file excerpts, 10 heuristic security findings |
 | Document evidence | Outline first: heading levels, tables, lists, numbering and paragraph length, so additions fit the existing structure |
@@ -72,7 +75,7 @@ verifiable prompt — written straight into the input box.
 
 ### The panel: family first, then style and focus
 
-![The enhancement panel: family tabs, style cards, focuses, methodology, workspace evidence, start button](docs/images/ui-panel.png)
+![The enhancement panel: family tabs, style cards, focuses, depth, methodology, workspace evidence, start button](docs/images/ui-panel.png)
 
 - **① Family tabs** — code, creative or documentation; each family remembers the style you used last.
 - **② Six styles** — two per family, each card states what it adds.
@@ -80,6 +83,8 @@ verifiable prompt — written straight into the input box.
 - **④ Methodology** — `auto` scores the scenario by default; the panel shows which set won, and you can pin one.
 - **⑤ Visible evidence** — before reading anything it tells you which directory, how many files, how many findings.
 - **⑥ One click to run** — turns into “stop” while streaming; the result is only written to the composer.
+- **⑦ Depth is orthogonal** — concise / default / thorough only control length: the same request can come back
+  as three lines or as a full structure.
 
 ### The result: edit first, then land it
 
@@ -91,7 +96,7 @@ verifiable prompt — written straight into the input box.
 
 ### Documentation: read the skeleton, then fill it in
 
-![The document panel: selected document with size and heading count, outline, candidate picker, refresh and start](docs/images/ui-panel-doc.png)
+![The document panel: selected document with size and heading count, outline, candidate picker, refresh, depth and start](docs/images/ui-panel-doc.png)
 
 - **① Pick the document first** — the selected document with its size and heading count; automatic selection
   ranks candidates by prompt relevance first, then sub-directory, `docs/`, recency and size.
@@ -100,6 +105,7 @@ verifiable prompt — written straight into the input box.
 - **③ The dropdown overrides auto-pick** — point at any document in the workspace instead.
 - **④ Refresh rescans the workspace** — files you just created or renamed show up immediately.
 - **⑤ Ranking, nothing more** — relevance and recency only decide which document is read; no file is modified.
+- **⑥ Depth applies here too** — one section or a whole chapter, same length knob.
 
 ![Document evidence: outline, formatting traits, excerpt and sibling documents framed as read-only evidence](docs/images/doc-evidence.svg)
 
@@ -130,6 +136,46 @@ sensitive data, dependency supply chain).
 
 Every style ends with the same output contract: emit *only* the enhanced prompt — no preamble, no
 commentary, keep the information density, and answer in the same language as the draft.
+
+## Depth: three lengths
+
+Models love to write long: the same request can come back as three screens or three lines. The panel's
+**depth axis is independent of family and style** — it only answers “how long should this be”.
+
+| Depth | Position | superpower | prompt-optimizer | LangGPT | AiShort |
+| --- | --- | --- | --- | --- | --- |
+| Concise `concise` | Goal, hard constraints and acceptance only; about a third of thorough | 1428 chars | 1028 | 1057 | 785 |
+| Default `default` | Sectioned but restrained; about two thirds of thorough | 2688 | 1935 | 1989 | 1478 |
+| Thorough `thorough` | Full structure, step plan and acceptance checklist | 4200 | 3024 | 3108 | 2310 |
+
+**Superpowers' thorough band (4200 characters) is the yardstick.** The other three are scaled by their
+measured output length (Prompt Optimizer 0.72, LangGPT 0.74, AiShort 0.55), so “thorough AiShort” is
+still shorter than “thorough Superpowers”, while a level means the same thing for every house style —
+no more “I picked concise and still got three screens”.
+
+Measured on one request (a batch-renaming desktop tool, `code-only`, `workbuddy2api-hub` /
+`deepseek-v4.1-flash`), both ends of the range:
+
+| Depth | superpower | prompt-optimizer | LangGPT | AiShort |
+| --- | --- | --- | --- | --- |
+| Thorough output | 5794 chars | 3906 | 4249 | 2901 |
+| Concise output | 1941 | 1466 | 1438 | 1149 |
+
+Concise lands at roughly a third of thorough for all four sets (the overshoot factor is ~1.3–1.5
+everywhere), so the numbers above are **budgets, not promises**: the model usually runs slightly over,
+but the relative gap between levels is stable.
+
+Shorter levels also tell the model **what to cut first**: Superpowers merges plan steps and drops
+interface tables and examples; LangGPT folds Role/Profile into one paragraph and drops Examples; AiShort
+keeps only the role, the deliverable and the format constraints; Prompt Optimizer drops the diagnosis
+pass and the contrast examples. Thorough does the opposite: full structure, every step with its output
+and verification.
+
+![Three depth bands: Superpowers' thorough band is the yardstick, the other sets are scaled per band](docs/images/depth.svg)
+
+All three levels end with “count the characters before you hand in; if you are over, delete examples →
+commentary → repeated requirements → step details, in that order”. Documentation mode adds “write section
+by section rather than padding”.
 
 ## Methodology selection
 
@@ -391,9 +437,9 @@ npm test         # tests only (node --test)
 No install step is needed; CI runs the same checks on Node 20 and 22. UI dev loop: edit `client.js` →
 touch the profile patch to reload the host → refresh the page.
 
-The images used above live in `docs/images/`: the three UI mockups are generated by
-`generate-mockups.py` (Pillow), the three diagrams by `generate-diagrams.py` (stdlib only) —
-see [docs/images/README.md](docs/images/README.md).
+The images used above live in `docs/images/`: the four UI mockups are generated by
+`generate-mockups.py` (Pillow), the five diagrams by `generate-diagrams.py` and `generate-depth.py`
+(stdlib only) — see [docs/images/README.md](docs/images/README.md).
 
 Contribution rules (encoding, commit format, PR checklist) are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -426,6 +472,9 @@ Contribution rules (encoding, commit format, PR checklist) are in [CONTRIBUTING.
 - Document filling covers the excerpt that fits `maxDocumentChars` (16 000 characters by default); the
   digest says “truncated” when a file is longer.
 - Quality depends on the selected model; reasoning models can take 7–28 s to first byte — use “Stop” if needed.
+- The depth budget is an instruction, not a guarantee: measured output runs ~1.3–1.5× over the quoted
+  number for all four sets. The relative gap between levels is stable; don't expect “concise” to land
+  under exactly 1428 characters.
 - A blank page with no `sessionId` has no composer control row, so no button is rendered until you enter a session.
 - Verified on the DSH Web GUI only; the Electron IPC form is untested.
 - Upstream prompt text is deliberately *not* merged (LangGPT's licence badge conflicts with its API

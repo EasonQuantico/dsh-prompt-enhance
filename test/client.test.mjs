@@ -186,6 +186,16 @@ test('browser half offers the documentation family', () => {
   assert.ok(source.includes('documentMissing'), 'a workspace without documents explains itself')
 })
 
+test('browser half exposes the three depth levels', () => {
+  assert.ok(source.includes("depthTitle: '档位'"), 'the depth row has a label')
+  assert.ok(source.includes("DEPTH_CHOICES = ['concise', 'default', 'thorough']"), 'all three levels are listed')
+  assert.ok(source.includes("DEFAULT_DEPTH = 'default'"), 'the middle band is the default')
+  assert.ok(source.includes('pickDepth'), 'the remembered level is restored')
+  assert.ok(source.includes('setDepth'), 'the level is selectable')
+  assert.ok(source.includes('catalogDepths'), 'levels come from /state, not hard-coded labels')
+  assert.ok(source.includes('depthBudget'), 'the result footer shows the quoted budget')
+})
+
 test('browser half obeys the plugin rules', () => {
   assert.equal(/require\(['"]@deepseek-ai\//.test(source), false, 'must not require harness client packages')
   assert.equal(/import\s+[^'"]*from\s+['"]@deepseek-ai\//.test(source), false, 'must not import harness packages')

@@ -13,6 +13,35 @@ All notable changes to this project are documented here. The format follows
   copy is replaced by a junction (or re-installed). Also documents that the Web GUI port changes
   between launches.
 
+## [1.2.0] — 2026-10-26
+
+Length control: every request now carries a depth level, and Superpowers' thorough band is the
+yardstick every other methodology is measured against.
+
+### Added
+
+- Three depth levels (档位): `concise` (简洁), `default` (默认) and `thorough` (严谨). The panel
+  grew a chip row, `POST /enhance` accepts `depth`, `/state` publishes `depths`, and the `meta`
+  event reports `depth`, `depthLabel` and the quoted `depthBudget`. An unknown level is a
+  `bad-depth` 400; an omitted one means `default`.
+- `strategies.js` exports `DEPTHS`, `DEPTH_IDS`, `METHODOLOGY_LENGTH`, `depthBudget()` and
+  `docOutputRule()`. Budgets are `clamp(4200 × levelScale × methodologyRatio)`, with
+  `levelScale` 0.34 / 0.64 / 1 and ratios superpower 1, prompt-optimizer 0.72, LangGPT 0.74,
+  AiShort 0.55 — calibrated on 2026-10-26 by running all four sets at both ends of the range on one
+  request (thorough 5794 / 3906 / 4249 / 2901 chars, concise 1941 / 1466 / 1438 / 1149). So
+  “thorough AiShort” is still shorter than “thorough Superpowers”, while a level means the same
+  thing for every house style; the model overshoots the printed budget by ~1.3–1.5× consistently.
+- Each level line is a hard cap (“硬上限 N 字，超出就必须删到上限以内”) plus a shared
+  “count before you hand in” self-check, which brought the overshoot down from ~1.9× to ~1.4×.
+- Shorter levels also say what to cut first for the chosen methodology (plan steps and interface
+  tables for Superpowers, Role/Profile merge for LangGPT, …) instead of only lowering a number.
+- Document mode quotes its own budget (`整体不超过 N 字`) and prefers writing section by section.
+
+### Changed
+
+- `OUTPUT_CONTRACT` no longer hard-codes “1200 字 / 2000 字”; it defers to the depth budget line.
+- The result footer shows the level and its budget (`档位 简洁 · ≤1428 字`).
+
 ## [1.1.1] — 2026-10-26
 
 ### Fixed

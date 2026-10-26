@@ -76,6 +76,39 @@ export const FOCUSES = [
 export const VARIANT_IDS = MODES.flatMap((mode) => mode.variants.map((variant) => variant.id))
 export const FOCUS_IDS = FOCUSES.map((focus) => focus.id)
 
+/**
+ * 篇幅档位（第三根轴）。Superpowers 的成稿就是「严谨」的标尺，其余方法论按实测比例换算：
+ * 同一档位下，各家都落在自己基线的同一百分比上，既不会「选了简洁，Superpowers 仍三屏」，
+ * 也不会「选了严谨，AiShort 仍一句话」。实测方法与复现命令见
+ * `docs/research/length-calibration.md`。
+ */
+export const DEPTHS = [
+  { id: 'concise', label: '简洁', hint: '只留目标、硬约束与验收，约为严谨档的三分之一' },
+  { id: 'default', label: '默认', hint: '分节但克制，约为严谨档的三分之二' },
+  { id: 'thorough', label: '严谨', hint: '完整结构、分步计划与验收清单，Superpowers 平时的篇幅' },
+]
+
+export const DEPTH_IDS = DEPTHS.map((depth) => depth.id)
+
+/**
+ * 以 Superpowers 为 1，其余方法论成稿长度是它的几分之几。
+ * 2026-10-26 实测（同一个 code-only 请求，四家各跑简洁与严谨两档）：
+ * 严谨档 5794 / 3906 / 4249 / 2901 字，简洁档 1941 / 1466 / 1438 / 1149 字，
+ * 去掉标尺后取两档平均，得到 prompt-optimizer 0.72、langgpt 0.74、aishort 0.55。
+ */
+export const METHODOLOGY_LENGTH = {
+  superpower: 1,
+  'prompt-optimizer': 0.72,
+  langgpt: 0.74,
+  aishort: 0.55,
+}
+
+const DEPTH_SCALE = { concise: 0.34, default: 0.64, thorough: 1 }
+/** 严谨档、Superpowers、同一个中等复杂度请求的实测长度（中文字符）。 */
+const DEPTH_BASE_CHARS = 4200
+const DEPTH_MIN_CHARS = 320
+const DEPTH_MAX_CHARS = 6000
+
 export const METHODOLOGIES = [
   {
     id: "superpower",
@@ -311,6 +344,18 @@ export function methodologyCatalogue() {
   ]
 }
 
+/**
+ * Character budget for one (methodology, depth) pair. The thorough band of
+ * Superpowers is the yardstick; every other methodology is scaled by its
+ * measured length ratio so a level means the same thing everywhere.
+ */
+export function depthBudget({ depth = 'default', methodologyId = 'superpower' } = {}) {
+  const scale = DEPTH_SCALE[depth] ?? DEPTH_SCALE.default
+  const base = METHODOLOGY_LENGTH[methodologyId] ?? 0.8
+  const chars = Math.round(DEPTH_BASE_CHARS * scale * base)
+  return Math.max(DEPTH_MIN_CHARS, Math.min(DEPTH_MAX_CHARS, chars))
+}
+
 function countMatches(text, words) {
   let hits = 0
   for (const word of words) if (text.includes(word)) hits += 1
@@ -463,9 +508,52 @@ const OUTPUT_CONTRACT = [
   '- 不要输出任何解释、前言、后记、"以下是"、分隔线或自我评价；',
   '- 使用与用户原提示词相同的语言（原提示词为中文则输出中文）；',
   '- 保持信息密度：不重复原提示词已说清的内容，不写空洞的形容词；',
-  '- 篇幅预算：一般不超过 1200 字；确有必要列结构清单时不超过 2000 字，宁可精简也不要堆砌；',
+  '- 篇幅以本节给出的档位预算为上限，宁可精简也不要堆砌；',
   '- 不输出代码实现本身（除非用户明确要求"直接给出实现"）。',
 ].join('\n')
+
+/** 档位规则：三段文字，分别约束「简洁 / 默认 / 严谨」的成稿形态。 */
+const DEPTH_RULES = {
+  concise: [
+    '篇幅档位：简洁。硬上限 {budget} 字（约 {lines} 行），超出就必须删到上限以内。',
+    '只保留：目标与交付物、硬约束、可判定的验收；背景、动机、风险铺陈与示例一律省略。',
+    '结构最多 3 段，一句一条要求；不用表格，不写代码示例，不逐条复述方法论流程。',
+    '方法论里偏流程的部件（任务块、接口表、示例、逐步清单）压成一句要求。{cut}',
+  ],
+  default: [
+    '篇幅档位：默认。硬上限 {budget} 字（约 {lines} 行），超出就必须删到上限以内。',
+    '分节但克制：每节 1–2 句；表格最多 1 个；示例最多 3 行；不重复原提示词已有的信息。',
+    '保留方法论的核心手法，删掉解释性铺陈与「为什么这样做」的说明。{cut}',
+  ],
+  thorough: [
+    '篇幅档位：严谨。硬上限 {budget} 字（约 {lines} 行），超出就必须删到上限以内。',
+    '结构完整：目标与现状、约束与假设、分步计划（每步含产出与验证）、验收标准、风险与待确认项。',
+    '可用表格与清单；每条要求都要可判定；无依据的细节写成「待确认」，不编造。',
+  ],
+}
+
+/** 所有档位共用的自检：先数一遍字数再交稿。 */
+const DEPTH_SELF_CHECK = [
+  '交稿前自检：数一遍成稿字数；超出上限时按「示例 → 解释 → 重复要求 → 步骤细节」的顺序删，直到不超。',
+].join('')
+
+/** 各方法论在「简洁 / 默认」档先砍什么——照抄它的手法时最该删的部件。 */
+const DEPTH_CUTS = {
+  superpower: '（Superpowers：先合并计划步骤，再删接口表与示例，只留一条验证命令当完成门槛。）',
+  langgpt: '（LangGPT：先把 Role/Profile 合成一段，再删 Examples 与重复 Rules，Workflow 留 3 步。）',
+  aishort: '（AiShort：只留角色、一句交付物与语言格式约束，负向约束压成一条。）',
+  'prompt-optimizer': '（Prompt Optimizer：先删诊断段，再删对错对照示例，保留结构骨架与 {{变量}} 占位符。）',
+}
+
+function renderDepthRule({ depth, methodologyId, budget }) {
+  const template = DEPTH_RULES[depth] || DEPTH_RULES.default
+  const cut = depth === 'thorough' ? '' : DEPTH_CUTS[methodologyId] || ''
+  const lines = Math.max(4, Math.round(budget / 38))
+  const body = template
+    .map((line) => line.replaceAll('{budget}', String(budget)).replaceAll('{lines}', String(lines)).replaceAll('{cut}', cut).trim())
+    .join('\n')
+  return `${body}\n${DEPTH_SELF_CHECK}`
+}
 
 function languageOf(text) {
   return /[\u4e00-\u9fff]/.test(text) ? '中文' : 'English'
@@ -473,15 +561,20 @@ function languageOf(text) {
 
 const MODE_LABELS = { code: '代码类', creative: '创作类', doc: '文档类' }
 
-const DOC_OUTPUT_RULE =
-  '文档类补充要求：保留原文档的标题层级、编号与表格列；补写内容必须能原样放回对应小节；篇幅以覆盖新增内容为准，一般不超过 2000 字。'
+function docOutputRule(budget) {
+  return [
+    '文档类补充要求：保留原文档的标题层级、编号与表格列；补写内容必须能原样放回对应小节。',
+    `篇幅以覆盖新增内容为准，整体不超过 ${budget} 字；宁可按小节分批补写，也不要为了填满篇幅而注水。`,
+  ].join('\n')
+}
 
 /**
  * Build the system prompt for one enhancement request.
  * `digest` is the workspace summary (`collectWorkspace`) for `code-read`, or the
  * document digest (`collectDocument`) for `doc-fill`; both are optional.
+ * `depth` is one of `DEPTH_IDS` and selects the length budget.
  */
-export function buildSystemPrompt({ mode, variant, focus = [], methodology, methodologyReason, promptText, digest }) {
+export function buildSystemPrompt({ mode, variant, focus = [], methodology, methodologyReason, promptText, digest, depth = 'default' }) {
   const parts = []
   parts.push('你是一名资深提示词工程师与技术写作专家，负责把用户草稿级的提示词改写为高质量、可执行的提示词。')
   parts.push(`本次增强：${MODE_LABELS[mode] || mode} / ${variant}。`)
@@ -515,8 +608,10 @@ export function buildSystemPrompt({ mode, variant, focus = [], methodology, meth
     )
   }
 
+  const budget = depthBudget({ depth, methodologyId: methodology && methodology.id ? methodology.id : 'superpower' })
+  parts.push(renderDepthRule({ depth, methodologyId: methodology && methodology.id ? methodology.id : 'superpower', budget }))
   parts.push(OUTPUT_CONTRACT)
-  if (mode === 'doc') parts.push(DOC_OUTPUT_RULE)
+  if (mode === 'doc') parts.push(docOutputRule(budget))
   parts.push(`用户原提示词语言：${languageOf(promptText)}，输出必须使用该语言。`)
 
   if (digest) parts.push(digest.kind === 'document' ? renderDocDigest(digest) : renderDigest(digest))
@@ -609,4 +704,4 @@ function renderDocDigest(digest) {
   return lines.join('\n')
 }
 
-export { OUTPUT_CONTRACT, VARIANT_RULES, FOCUS_RULES, DOC_OUTPUT_RULE }
+export { OUTPUT_CONTRACT, VARIANT_RULES, FOCUS_RULES, DEPTH_RULES, docOutputRule }

@@ -31,6 +31,14 @@ HTTP API and the client renders the composer control-row UI.
 | `doc-fill` | 读文档后补写 | read one document's outline + formatting, then rewrite the prompt so the model fills the gaps in that structure |
 | `doc-draft` | 按类型起草 | no document to read; ask for a document-type skeleton and writing rules |
 
+`depth` — the length band, orthogonal to mode and variant:
+
+| id | label (zh) | meaning |
+| --- | --- | --- |
+| `concise` | 简洁 | only goal, hard constraints and acceptance; roughly a third of the thorough band |
+| `default` | 默认 | sectioned but restrained; roughly two thirds of the thorough band |
+| `thorough` | 严谨 | full structure, step plan and acceptance checklist; Superpowers' usual length |
+
 `focus` — only for `code` variants, at least one required:
 
 - `framework` — 完善开发框架 (architecture, module layout, contracts, testing, delivery)
@@ -53,6 +61,21 @@ Each methodology carries three fragments: `codeSystem` (engineering), `creativeS
 (writing) and `docSystem` (document work: keep the existing skeleton, mark gaps instead of
 inventing them).
 
+`depth` — optional, one of `concise` (简洁), `default` (默认) or `thorough` (严谨); omitted means
+`default`, anything else is `bad-depth` (400). The level sets a character budget for the
+generated prompt: `clamp(4200 × levelScale × methodologyRatio)` with `levelScale` 0.34 / 0.64 / 1
+and `methodologyRatio` `superpower` 1, `prompt-optimizer` 0.72, `langgpt` 0.74, `aishort` 0.55
+(measured 2026-10-26 on one request, averaging both ends of the range). Superpowers' thorough band
+(4200) is the yardstick; every other methodology is scaled by its measured length so the same level
+means the same thing across house styles. Shorter levels also name what to cut first for that
+methodology rather than only lowering a number.
+
+| depth | superpower | prompt-optimizer | langgpt | aishort |
+| --- | --- | --- | --- | --- |
+| `concise` | 1428 | 1028 | 1057 | 785 |
+| `default` | 2688 | 1935 | 1989 | 1478 |
+| `thorough` | 4200 | 3024 | 3108 | 2310 |
+
 ## HTTP API (host)
 
 All responses are JSON unless noted. Errors use `{ ok: false, error: { code, message } }`
@@ -65,7 +88,7 @@ so every write must be guarded by loopback + same-origin + JSON content-type che
 ```json
 {
   "ok": true,
-  "version": "1.1.1",
+  "version": "1.2.0",
   "provider": "workbuddy2api-hub",
   "model": "deepseek-v4.1-flash",
   "modelSource": "session-default",
@@ -85,6 +108,11 @@ so every write must be guarded by loopback + same-origin + JSON content-type che
   "focuses": [
     { "id": "framework", "label": "完善开发框架", "hint": "模块划分、接口契约、测试与交付" },
     { "id": "security", "label": "审查安全性", "hint": "威胁模型、输入校验、注入面与密钥" }
+  ],
+  "depths": [
+    { "id": "concise", "label": "简洁", "hint": "只留目标、硬约束与验收，约为严谨档的三分之一" },
+    { "id": "default", "label": "默认", "hint": "分节但克制，约为严谨档的三分之二" },
+    { "id": "thorough", "label": "严谨", "hint": "完整结构、分步计划与验收清单，Superpowers 平时的篇幅" }
   ],
   "methodologies": [
     { "id": "auto", "label": "自适应（推荐）", "hint": "按类型与内容自动选择" },
@@ -177,6 +205,7 @@ Request body:
   "mode": "doc",
   "variant": "doc-fill",
   "focus": [],
+  "depth": "concise",
   "methodology": "auto",
   "docPath": "prompt-enhance/README.md",
   "cwd": "C:\\optional\\absolute\\path",
@@ -186,7 +215,7 @@ Request body:
 
 `mode` must be one of the catalogue ids and `variant` must start with `${mode}-`;
 `focus` is required for `code` variants and ignored otherwise; `docPath` only matters for
-`doc-fill`.
+`doc-fill`; `depth` is optional and defaults to `default`.
 
 Validation errors (400/413/415) are plain JSON. A successful call switches to SSE with
 `Cache-Control: no-cache, no-transform`, `Connection: keep-alive`, `X-Accel-Buffering: no`.
@@ -195,7 +224,7 @@ Events (each `data:` line is one JSON object; a `: ping` comment is sent every 1
 
 | event | data |
 | --- | --- |
-| `meta` | `{ provider, model, modelSource, promptChars, mode, variant, focus, methodology, methodologyLabel, methodologyReason, workspaceRoot, workspaceSource, workspaceFiles, workspaceScanned, securityFindings, documentPath, documentChars, documentHeadings, documentTruncated, startedAt }` |
+| `meta` | `{ provider, model, modelSource, promptChars, mode, variant, focus, depth, depthLabel, depthBudget, methodology, methodologyLabel, methodologyReason, workspaceRoot, workspaceSource, workspaceFiles, workspaceScanned, securityFindings, documentPath, documentChars, documentHeadings, documentTruncated, startedAt }` |
 | `status` | `{ stage: "reasoning", chars }` (throttled to one per ~1.2 s) or `{ stage: "text", chars: 0 }` on the first visible token |
 | `delta` | `{ text }` |
 | `done` | `{ text, usage, finish, durationMs, truncated }` |
@@ -205,7 +234,7 @@ Events (each `data:` line is one JSON object; a `: ping` comment is sent every 1
 
 Validation error codes: `empty-prompt` (400), `prompt-too-long` (413), `bad-mode` (400),
 `bad-variant` (400), `mode-variant-mismatch` (400), `empty-focus` (400),
-`bad-methodology` (400), `no-model` (503), and for `doc-fill`: `no-document` (400),
+`bad-depth` (400), `bad-methodology` (400), `no-model` (503), and for `doc-fill`: `no-document` (400),
 `doc-outside-root` (400), `doc-unsupported` (400), `doc-unreadable` (400).
 
 The host aborts the model call when the HTTP request closes.
@@ -246,6 +275,8 @@ UI requirements:
      remembered in `localStorage` under `dsh-prompt-enhance.prefs` (panel choices only, never
      the draft text).
    - Code mode: focus checkboxes (`framework`, `security`), at least one required.
+   - Depth chips (`简洁` / `默认` / `严谨`) for every mode, with the current level's hint on the
+     right; the last level is remembered like the other panel choices.
    - Methodology select (`auto` first) with the hint text.
    - Workspace preview line for `code-read`: file count + "预览/刷新" that calls the
      workspace endpoint and shows the first few paths.

@@ -349,6 +349,7 @@ test('/enhance rejects bad requests with stable error codes', async () => {
       400,
       'bad-methodology',
     ],
+    [{ prompt: 'hi', mode: 'code', variant: 'code-only', focus: ['framework'], depth: 'epic' }, 400, 'bad-depth'],
   ]
 
   for (const [body, status, code] of cases) {
@@ -485,6 +486,56 @@ test('/enhance honours an explicit methodology and keeps it out of workspace sca
   assert.equal(meta.methodology, 'langgpt')
   assert.equal(meta.workspaceFiles, 0)
   assert.equal(meta.securityFindings, 0)
+})
+
+test('/enhance takes the requested depth and reports its budget', async () => {
+  const { stream, calls } = recordingStream([
+    { type: 'text-delta', text: '# 任务' },
+    { type: 'finish', reason: { kind: 'stop' } },
+  ])
+  const { handler } = mount({ stream })
+  const response = await call(handler, {
+    method: 'POST',
+    url: '/prompt-enhance/api/enhance',
+    headers: { 'sec-fetch-site': 'same-origin' },
+    body: {
+      prompt: '写一个批量重命名图片的桌面工具',
+      mode: 'code',
+      variant: 'code-only',
+      focus: ['framework'],
+      methodology: 'superpower',
+      depth: 'concise',
+    },
+  })
+
+  const meta = response.sse().find((item) => item.event === 'meta').data
+  assert.equal(meta.depth, 'concise')
+  assert.equal(meta.depthLabel, '简洁')
+  assert.equal(meta.depthBudget, 1428)
+
+  const systemText = calls[0].messages[0].content[0].text
+  assert.match(systemText, /篇幅档位：简洁/)
+  assert.match(systemText, /1428/)
+  assert.doesNotMatch(systemText, /篇幅档位：严谨/)
+})
+
+test('an omitted depth defaults to the middle band', async () => {
+  const { stream, calls } = recordingStream([
+    { type: 'text-delta', text: '结果' },
+    { type: 'finish', reason: { kind: 'stop' } },
+  ])
+  const { handler } = mount({ stream })
+  const response = await call(handler, {
+    method: 'POST',
+    url: '/prompt-enhance/api/enhance',
+    headers: { 'sec-fetch-site': 'same-origin' },
+    body: { prompt: '补全', mode: 'code', variant: 'code-only', focus: ['framework'], methodology: 'langgpt' },
+  })
+  const meta = response.sse().find((item) => item.event === 'meta').data
+  assert.equal(meta.depth, 'default')
+  assert.equal(meta.depthLabel, '默认')
+  assert.equal(meta.depthBudget, 1989)
+  assert.match(calls[0].messages[0].content[0].text, /篇幅档位：默认/)
 })
 
 test('a max-tokens finish is reported as truncated', async () => {

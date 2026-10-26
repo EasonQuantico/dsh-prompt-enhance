@@ -3,9 +3,9 @@
 
 These images are *mockups*, not screenshots: they follow the real layout and
 copy of `client.js` (the trigger in `conversation.input.right`, the panel's
-tab / card / focus / methodology / workspace rows, and the result area) so the
-docs can show the shape of the UI without shipping screen captures of a private
-workspace.
+tab / card / focus / depth / methodology / workspace rows, and the result area)
+so the docs can show the shape of the UI without shipping screen captures of a
+private workspace.
 
 Requires Pillow (`pip install pillow`) and a CJK-capable font. On Windows the
 default paths below (Microsoft YaHei, Consolas) are used; elsewhere point
@@ -199,30 +199,41 @@ class Notes:
         self.placed = []
         self.probe = ImageDraw.Draw(Image.new("RGBA", (4, 4)))
 
-    def add(self, y_element, title, detail=""):
-        self.items.append((y_element, title, detail))
+    def add(self, y_element, title, detail="", order=None, elbow=26):
+        """Queue one note.
+
+        `order` keeps a note at the end of the numbering while its leader still
+        starts at `y_element` (the badge lands below the others, the elbow walks
+        there); `elbow` shifts that note's vertical run so two leaders never
+        share a trunk.
+        """
+        self.items.append((y_element, title, detail, order, elbow))
 
     def place(self, min_gap):
+        def sort_key(item):
+            y_element, _, _, order, _ = item
+            return (1, order, y_element) if order is not None else (0, 0, y_element)
+
         self.placed = []
         last_y = None
-        for index, (y_element, title, detail) in enumerate(sorted(self.items, key=lambda item: item[0]), start=1):
+        for index, (y_element, title, detail, _, elbow) in enumerate(sorted(self.items, key=sort_key), start=1):
             center = y_element if last_y is None else max(y_element, last_y + min_gap)
             lines = wrap_mixed(self.probe, detail, 11.5, self.wrap_width)
             last_y = center
-            self.placed.append((index, y_element, center, title, lines))
+            self.placed.append((index, y_element, center, title, lines, elbow))
         return last_y
 
     def bottom(self):
         if not self.placed:
             return 0
-        index, _, center, _, lines = self.placed[-1]
+        index, _, center, _, lines, _ = self.placed[-1]
         return center + s(21) + s(17) * (len(lines) - 1)
 
     def draw(self, draw):
-        for index, y_element, center, title, lines in self.placed:
+        for index, y_element, center, title, lines, elbow in self.placed:
             badge_r = s(11)
             bx = self.text_x - s(30)
-            elbow_x = self.edge_x + s(26)
+            elbow_x = self.edge_x + s(elbow)
             # leader: out of the panel, then vertically to the note, then into the badge
             draw.line([(self.edge_x + s(6), y_element), (elbow_x, y_element)], fill=ANNO, width=s(1))
             draw.line([(elbow_x, y_element), (elbow_x, center)], fill=ANNO, width=s(1))
@@ -315,6 +326,24 @@ def panel_check(draw, x, y, label, active):
     else:
         text(draw, x + s(10), y + h / 2, label, f, TEXT2, anchor="lm")
     return x + w
+
+
+DEPTHS = (("简洁", False), ("默认", True), ("严谨", False))
+DEPTH_HINT = "分节但克制，约为严谨档的三分之二"
+
+
+def panel_depth(draw, x, y, hint_x):
+    """The 档位 row: small label, three length chips (默认 active), dimmed hint.
+
+    Mirrors `client.js`: the depth chips reuse the focus row's `.dpe-check`
+    styling, the hint is the active level's `hint` shown as a `.dpe-label`.
+    """
+    text(draw, x, y + s(6), "档位", font("ui", 11), TEXT3)
+    cursor = x + s(56)
+    for label, active in DEPTHS:
+        cursor = panel_check(draw, cursor, y, label, active) + s(6)
+    text(draw, hint_x, y + s(13), DEPTH_HINT, font("ui", 11), TEXT3, anchor="lm")
+    return cursor
 
 
 def panel_select(draw, x, y, w, label):
@@ -431,6 +460,8 @@ def render_panel(path):
     y += s(12)
     focus_y = y
     y += s(32)
+    depth_y = y
+    y += s(32)
     method_y = y
     y += s(32) + s(10)
     note_y = y
@@ -449,6 +480,15 @@ def render_panel(path):
     notes.add(method_y + s(13), "方法论可自适应", "默认 auto 按场景打分，也可手动锁定某一家")
     notes.add(note_y + note_h / 2, "工作区证据可见", "读取前就告诉你要扫哪、多少文件、几处安全命中")
     notes.add(actions_y + s(14), "一句话启动", "不自动发送：结果只回填输入框")
+    # Appended last in the numbering: the row is mid-panel, the badge sits at the
+    # bottom of the column and its leader elbows down past the other annotations.
+    notes.add(
+        depth_y + s(13),
+        "档位独立于类型",
+        "同一个请求可以只留三行，也可以给到完整结构",
+        order=1,
+        elbow=12,
+    )
     notes.place(s(60))
 
     img = Image.new("RGBA", (s(css_w), max(bottom, notes.bottom()) + s(34)), BG + (255,))
@@ -480,6 +520,8 @@ def render_panel(path):
     text(draw, inner_x, focus_y + s(6), "优化方向", font("ui", 11), TEXT3)
     cx = panel_check(draw, inner_x + s(56), focus_y, "完善开发框架", True) + s(6)
     panel_check(draw, cx, focus_y, "审查安全性", True)
+
+    panel_depth(draw, inner_x, depth_y, inner_x + s(258))
 
     text(draw, inner_x, method_y + s(6), "方法论", font("ui", 11), TEXT3)
     panel_select(draw, inner_x + s(56), method_y, s(190), "自适应（推荐）")
@@ -662,6 +704,8 @@ def render_panel_doc(path):
     doc_y = y
     doc_h = s(216)
     y += doc_h + s(12)
+    depth_y = y
+    y += s(32)
     method_y = y
     y += s(32) + s(12)
     actions_y = y
@@ -674,6 +718,13 @@ def render_panel_doc(path):
     notes.add(doc_y + s(149), "候选文档下拉：可手动指定要补写的文件")
     notes.add(doc_y + s(195), "刷新文档会重新扫描工作区")
     notes.add(doc_y + s(208), "自动挑选按提示词相关性与近期修改排序")
+    notes.add(
+        depth_y + s(13),
+        "档位独立于类型",
+        "同一个请求可以只留三行，也可以给到完整结构",
+        order=1,
+        elbow=12,
+    )
     notes.place(s(46))
 
     img = Image.new("RGBA", (s(css_w), max(bottom, notes.bottom()) + s(34)), BG + (255,))
@@ -702,6 +753,8 @@ def render_panel_doc(path):
         False,
     )
     panel_doc_block(draw, inner_x, doc_y, inner_w, doc_h)
+
+    panel_depth(draw, inner_x, depth_y, inner_x + s(258))
 
     text(draw, inner_x, method_y + s(6), "方法论", font("ui", 11), TEXT3)
     panel_select(draw, inner_x + s(56), method_y, s(190), "自适应（推荐）")

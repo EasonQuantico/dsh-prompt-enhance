@@ -15,13 +15,16 @@ import {
   METHODOLOGIES,
   VARIANT_IDS,
   FOCUS_IDS,
+  DEPTHS,
+  DEPTH_IDS,
   buildSystemPrompt,
+  depthBudget,
   methodologyById,
   methodologyCatalogue,
   selectMethodology,
 } from './strategies.js'
 
-export const VERSION = '1.1.1'
+export const VERSION = '1.2.0'
 /** `llm` is required for the enhance route; `webServer` is injected locally below. */
 export const inject = ['llm']
 const ROUTE_PREFIX = '/prompt-enhance/api'
@@ -774,6 +777,7 @@ async function handleState(ctx, state, response) {
     },
     modes: MODES,
     focuses: FOCUSES,
+    depths: DEPTHS,
     methodologies: methodologyCatalogue(),
     client: { beats: state.presence.length, recent: state.presence.slice(-6) },
   })
@@ -875,6 +879,9 @@ async function handleEnhance(ctx, state, request, response) {
   const focus = Array.isArray(body.focus) ? body.focus.filter((item) => FOCUS_IDS.includes(item)) : []
   if (variant.startsWith('code-') && focus.length === 0) return sendError(response, 400, 'empty-focus', '代码类至少选择一个优化方向')
 
+  const depth = body.depth === undefined || body.depth === null || body.depth === '' ? 'default' : String(body.depth)
+  if (!DEPTH_IDS.includes(depth)) return sendError(response, 400, 'bad-depth', `depth 必须是 ${DEPTH_IDS.join('、')} 或省略`)
+
   const requested = typeof body.methodology === 'string' && body.methodology ? body.methodology : 'auto'
   if (requested !== 'auto' && !methodologyById(requested)) return sendError(response, 400, 'bad-methodology', `未知 methodology：${requested}`)
 
@@ -913,6 +920,7 @@ async function handleEnhance(ctx, state, request, response) {
 
   const methodologyChoice = selectMethodology({ mode, variant, focus, prompt, requested })
   const methodology = methodologyById(methodologyChoice.id) || METHODOLOGIES[0]
+  const budget = depthBudget({ depth, methodologyId: methodology.id })
   const systemText = buildSystemPrompt({
     mode,
     variant,
@@ -921,6 +929,7 @@ async function handleEnhance(ctx, state, request, response) {
     methodologyReason: methodologyChoice.reason,
     promptText: prompt,
     digest,
+    depth,
   })
 
   const job = { cancel: () => {}, closed: false }
@@ -958,6 +967,9 @@ async function handleEnhance(ctx, state, request, response) {
     mode,
     variant,
     focus,
+    depth,
+    depthLabel: (DEPTHS.find((entry) => entry.id === depth) || {}).label || depth,
+    depthBudget: budget,
     methodology: methodology.id,
     methodologyLabel: methodology.label,
     methodologyReason: methodologyChoice.reason,

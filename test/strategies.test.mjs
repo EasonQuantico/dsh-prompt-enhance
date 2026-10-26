@@ -10,6 +10,11 @@ import {
   FOCUS_RULES,
   OUTPUT_CONTRACT,
   VARIANT_RULES,
+  DEPTHS,
+  DEPTH_IDS,
+  METHODOLOGY_LENGTH,
+  docOutputRule,
+  depthBudget,
   methodologyById,
   methodologyCatalogue,
   selectMethodology,
@@ -282,3 +287,113 @@ test('document digest is framed as read-only evidence', () => {
   assert.equal(system.includes('开发框架维度必须覆盖'), false)
   assert.equal(system.includes('安全维度必须覆盖'), false)
 })
+
+/* ------------------------------------------------------------------ */
+/* depth levels                                                       */
+/* ------------------------------------------------------------------ */
+
+test('three depth levels all scale from the superpower yardstick', () => {
+  assert.deepEqual(DEPTH_IDS, ['concise', 'default', 'thorough'])
+  for (const entry of DEPTHS) {
+    assert.equal(typeof entry.label, 'string')
+    assert.ok(entry.hint.length > 0, `${entry.id} needs a hint`)
+  }
+
+  assert.equal(depthBudget({ depth: 'thorough', methodologyId: 'superpower' }), 4200)
+  assert.equal(depthBudget({ depth: 'concise', methodologyId: 'superpower' }), 1428)
+
+  for (const id of METHODOLOGY_IDS) {
+    const concise = depthBudget({ depth: 'concise', methodologyId: id })
+    const standard = depthBudget({ depth: 'default', methodologyId: id })
+    const thorough = depthBudget({ depth: 'thorough', methodologyId: id })
+    assert.ok(concise < standard && standard < thorough, `${id} must grow with the depth level`)
+    assert.equal(thorough, Math.round(4200 * METHODOLOGY_LENGTH[id]))
+  }
+
+  // A level means the same percentile for every methodology, so a shorter
+  // house style never overshoots the longer one at the same level.
+  for (const depth of DEPTH_IDS) {
+    const superpower = depthBudget({ depth, methodologyId: 'superpower' })
+    const aishort = depthBudget({ depth, methodologyId: 'aishort' })
+    assert.ok(aishort < superpower)
+  }
+
+  assert.equal(depthBudget({ depth: 'nonsense' }), depthBudget({ depth: 'default' }))
+  assert.ok(depthBudget({ methodologyId: 'unknown-house' }) > 0)
+})
+
+test('the depth level rewrites the budget inside the system prompt', () => {
+  const base = {
+    mode: 'code',
+    variant: 'code-read',
+    focus: ['framework'],
+    methodology: methodologyById('superpower'),
+    methodologyReason: '自动选择',
+    promptText: '把批量重命名图片的小工具补全',
+  }
+
+  const concise = buildSystemPrompt({ ...base, depth: 'concise' })
+  const standard = buildSystemPrompt({ ...base, depth: 'default' })
+  const thorough = buildSystemPrompt({ ...base, depth: 'thorough' })
+
+  assert.ok(concise.includes('篇幅档位：简洁'))
+  assert.ok(concise.includes('1428'))
+  assert.ok(standard.includes('篇幅档位：默认'))
+  assert.ok(standard.includes('2688'))
+  assert.ok(thorough.includes('篇幅档位：严谨'))
+  assert.ok(thorough.includes('4200'))
+
+  // The instruction text grows slightly at the short end (it explains what to
+  // drop first), so compare the budgets it quotes rather than the raw length.
+  const quoted = (text) => Number(/硬上限 (\d+) 字/.exec(text)[1])
+  assert.ok(quoted(concise) < quoted(standard) && quoted(standard) < quoted(thorough))
+  // Shorter levels tell the model which methodology parts to drop first;
+  // the thorough level has nothing to cut.
+  assert.ok(concise.includes('先合并计划步骤'))
+  assert.equal(thorough.includes('先合并计划步骤'), false)
+})
+
+test('a missing depth behaves like the default band', () => {
+  const base = {
+    mode: 'creative',
+    variant: 'creative-rich',
+    methodology: methodologyById('langgpt'),
+    methodologyReason: '自动选择',
+    promptText: '写一个雨夜咖啡馆的短片开头',
+  }
+  assert.equal(buildSystemPrompt(base), buildSystemPrompt({ ...base, depth: 'default' }))
+  assert.equal(buildSystemPrompt({ ...base, depth: 'nonsense' }), buildSystemPrompt({ ...base, depth: 'default' }))
+})
+
+test('the document budget follows the same yardstick', () => {
+  const langgpt = methodologyById('langgpt')
+  const digest = {
+    kind: 'document',
+    root: '/tmp/fixture',
+    cwd: '/tmp/fixture',
+    path: 'README.md',
+    chars: 1200,
+    lines: 40,
+    truncated: false,
+    headings: [{ level: 1, text: '安装', line: 1 }],
+    format: {},
+    documents: [],
+    text: '# 安装\n',
+  }
+
+  for (const depth of DEPTH_IDS) {
+    const budget = depthBudget({ depth, methodologyId: 'langgpt' })
+    const system = buildSystemPrompt({
+      mode: 'doc',
+      variant: 'doc-fill',
+      methodology: langgpt,
+      methodologyReason: '文档补写场景下 LangGPT 的结构化手法最贴合（自动选择）',
+      promptText: '给安装指南补上离线安装',
+      digest,
+      depth,
+    })
+    assert.ok(system.includes(`整体不超过 ${budget} 字`), `${depth} should quote its own document budget`)
+    assert.ok(system.includes(docOutputRule(budget)))
+  }
+})
+

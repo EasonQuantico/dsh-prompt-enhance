@@ -32,6 +32,8 @@ window.__ModuleLoader__.load({
       tabDoc: '文档',
       focusTitle: '优化方向',
       focusHint: '至少选择一项',
+      depthTitle: '档位',
+      depthHint: '简洁 / 默认 / 严谨',
       methodology: '方法论',
       methodologyAuto: '自适应',
       workspace: '工作区',
@@ -64,6 +66,7 @@ window.__ModuleLoader__.load({
       noModel: '当前没有可用模型，请先在设置里选择默认模型。',
       metaModel: '模型',
       metaMethod: '方法论',
+      metaDepth: '档位',
       metaFiles: '读取文件',
       metaSecurity: '安全命中',
       metaDocument: '文档',
@@ -77,6 +80,8 @@ window.__ModuleLoader__.load({
     const VARIANT_CHOICES = ['code-read', 'code-only', 'creative-rich', 'creative-structure', 'doc-fill', 'doc-draft']
     const FOCUS_CHOICES = ['framework', 'security']
     const MODE_CHOICES = ['code', 'creative', 'doc']
+    const DEPTH_CHOICES = ['concise', 'default', 'thorough']
+    const DEFAULT_DEPTH = 'default'
     const PREFS_KEY = 'dsh-prompt-enhance.prefs'
 
     /** Last-used panel choices, remembered per browser (optional, best effort). */
@@ -120,6 +125,11 @@ window.__ModuleLoader__.load({
     function pickDocPath(prefs) {
       const saved = prefs && typeof prefs.docPath === 'string' ? prefs.docPath : ''
       return saved.slice(0, 400)
+    }
+
+    function pickDepth(prefs) {
+      const saved = prefs && typeof prefs.depth === 'string' ? prefs.depth : ''
+      return DEPTH_CHOICES.includes(saved) ? saved : DEFAULT_DEPTH
     }
 
     /* ---------------------------------------------------------------- */
@@ -407,6 +417,7 @@ window.__ModuleLoader__.load({
       const [mode, setMode] = useState(() => (prefs && MODE_CHOICES.includes(prefs.mode) ? prefs.mode : 'code'))
       const [variants, setVariants] = useState(() => pickVariants(prefs))
       const [focus, setFocus] = useState(() => pickFocus(prefs))
+      const [depth, setDepth] = useState(() => pickDepth(prefs))
       const [docPath, setDocPath] = useState(() => pickDocPath(prefs))
       const [methodology, setMethodology] = useState(() =>
         prefs && typeof prefs.methodology === 'string' && prefs.methodology ? prefs.methodology : 'auto',
@@ -483,8 +494,8 @@ window.__ModuleLoader__.load({
       }, [open])
 
       useEffect(() => {
-        writePrefs({ mode, variants, focus, methodology, docPath })
-      }, [mode, variants, focus, methodology, docPath])
+        writePrefs({ mode, variants, focus, depth, methodology, docPath })
+      }, [mode, variants, focus, depth, methodology, docPath])
 
       /* catalog -------------------------------------------------------- */
 
@@ -664,7 +675,7 @@ window.__ModuleLoader__.load({
         setMeta(null)
         setProgress(null)
         insertionRef.current = captureInsertion()
-        beat('enhance-start', `${mode}/${variant}/${methodology}`)
+        beat('enhance-start', `${mode}/${variant}/${methodology}/${depth}`)
 
         const controller = new AbortController()
         abortRef.current = controller
@@ -674,6 +685,7 @@ window.__ModuleLoader__.load({
           mode,
           variant,
           methodology,
+          depth,
           ...(mode === 'code' ? { focus } : {}),
           ...(mode === 'doc' && docPath ? { docPath } : {}),
           ...(sessionCwd ? { cwd: sessionCwd } : {}),
@@ -734,7 +746,7 @@ window.__ModuleLoader__.load({
         } finally {
           if (abortRef.current === controller) abortRef.current = null
         }
-      }, [captureInsertion, docPath, documents, focus, methodology, mode, sessionCwd, sessionId, stage, trimmedDraft, variant, wantsDocument])
+      }, [captureInsertion, docPath, documents, depth, focus, methodology, mode, sessionCwd, sessionId, stage, trimmedDraft, variant, wantsDocument])
 
       useEffect(() => () => {
         if (abortRef.current) abortRef.current.abort()
@@ -924,6 +936,35 @@ window.__ModuleLoader__.load({
               )
             : null
 
+        const catalogDepths = catalog && Array.isArray(catalog.depths) ? catalog.depths : []
+        const depthRow = catalogDepths.length
+          ? h(
+              'div',
+              { className: 'dpe-row' },
+              h('span', { className: 'dpe-label' }, LABELS.depthTitle),
+              ...catalogDepths.map((entry) =>
+                h(
+                  'button',
+                  {
+                    key: entry.id,
+                    type: 'button',
+                    className: 'dpe-check',
+                    'data-active': depth === entry.id ? 'true' : 'false',
+                    'aria-pressed': depth === entry.id ? 'true' : 'false',
+                    title: entry.hint || entry.label,
+                    onClick: () => setDepth(entry.id),
+                  },
+                  entry.label,
+                ),
+              ),
+              h(
+                'span',
+                { className: 'dpe-label' },
+                (catalogDepths.find((entry) => entry.id === depth) || {}).hint || '',
+              ),
+            )
+          : null
+
         const methodRow = h(
           'div',
           { className: 'dpe-row' },
@@ -1060,6 +1101,9 @@ window.__ModuleLoader__.load({
               { className: 'dpe-meta' },
               meta.provider && meta.model ? h('span', null, `${LABELS.metaModel} ${meta.provider}/${meta.model}`) : null,
               meta.methodologyLabel ? h('span', null, `${LABELS.metaMethod} ${meta.methodologyLabel}`) : null,
+              meta.depthLabel
+                ? h('span', null, `${LABELS.metaDepth} ${meta.depthLabel}${meta.depthBudget ? ` · ≤${meta.depthBudget} 字` : ''}`)
+                : null,
               wantsWorkspace ? h('span', null, `${LABELS.metaFiles} ${meta.workspaceScanned || 0}`) : null,
               wantsWorkspace ? h('span', null, `${LABELS.metaSecurity} ${meta.securityFindings || 0}`) : null,
               wantsDocument ? h('span', null, `${LABELS.metaDocument} ${meta.documentPath || '—'}`) : null,
@@ -1151,6 +1195,7 @@ window.__ModuleLoader__.load({
           tabs,
           cards,
           focusRow,
+          depthRow,
           methodRow,
           workspaceNote,
           documentNote,
