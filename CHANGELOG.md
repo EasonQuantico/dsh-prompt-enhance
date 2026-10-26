@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Docs
+
+- Installation gained a “new version, old behaviour?” section: `dsh plugin install` copies a
+  `file:` dependency into the profile, so a checkout-only edit keeps the old code alive until that
+  copy is replaced by a junction (or re-installed). Also documents that the Web GUI port changes
+  between launches.
+
 ## [1.1.1] — 2026-10-26
 
 ### Fixed

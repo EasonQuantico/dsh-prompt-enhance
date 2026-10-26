@@ -212,7 +212,8 @@ ln -s /absolute/path/to/dsh-prompt-enhance ~/.dsh/profiles/<profile>/node_module
 ### 3. Load it
 
 - Changing the profile manifest (step 1) triggers DSH's HMR recomposition; a restart is normally unnecessary.
-- **Plugin code changes alone** are not watched, so touch the profile patch file to force a reload:
+- **Plugin code changes alone** are not watched, so touch the profile patch file to force a reload
+  (provided step 2 used a link; a copied directory will not pick the change up — see step 5):
 
   ```powershell
   Add-Content "$HOME\.dsh\profiles\<profile>\cordis.patch.yml" "# reload prompt-enhance $(Get-Date -Format o)"
@@ -223,8 +224,10 @@ ln -s /absolute/path/to/dsh-prompt-enhance ~/.dsh/profiles/<profile>/node_module
 ### 4. Verify
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:2896/prompt-enhance/api/state
+Invoke-RestMethod http://127.0.0.1:<port>/prompt-enhance/api/state
 ```
+
+The port can change between launches; use the one the Web GUI is served from.
 
 `ok: true` with `provider` / `model` / `modes` / `methodologies` means the host half is mounted.
 After a page refresh the ✨ button should sit in the composer's right-hand control row.
@@ -234,6 +237,27 @@ trigger one reload.
 
 > No links? Copying the whole directory into `<profile>/node_modules/dsh-prompt-enhance` works too —
 > you just have to re-copy it on every update.
+
+### 5. New version, old behaviour?
+
+`dsh plugin install` / `pnpm install` **copies** a `file:` dependency into the profile's
+`node_modules` (preserving mtimes). Editing your checkout afterwards leaves that copy frozen, and
+even a restart only loads the stale code. The symptom is `/prompt-enhance/api/state` reporting an
+older `version` than `package.json`, with missing families in `modes`.
+
+Check and fix:
+
+```powershell
+$link = "$HOME\.dsh\profiles\<profile>\node_modules\dsh-prompt-enhance"
+(Get-Item $link).LinkType          # empty = a real (stale) directory; Junction means it is a link
+Remove-Item $link -Recurse -Force
+New-Item -ItemType Junction -Path $link -Target "C:\absolute\path\to\dsh-prompt-enhance"
+Add-Content "$HOME\.dsh\profiles\<profile>\cordis.patch.yml" "# reload prompt-enhance $(Get-Date -Format o)"
+```
+
+After about ten seconds `version` should match `package.json` and `modes` should list
+`code` / `creative` / `doc`. The host half does **not** need a restart — the reload comment re-imports
+the files behind the link; the browser half needs one page refresh.
 
 ## Usage
 

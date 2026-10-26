@@ -204,7 +204,8 @@ ln -s /absolute/path/to/dsh-prompt-enhance ~/.dsh/profiles/<profile>/node_module
 ### 3. 让它加载
 
 - 改了 profile 清单（步骤 1）时，DSH 的 HMR 会自动重组，通常无需重启。
-- **只改了插件代码**时，HMR 不会盯着插件目录，往 profile 的 `cordis.patch.yml` 末尾追加一行注释即可触发重载：
+- **只改了插件代码**时，HMR 不会盯着插件目录，往 profile 的 `cordis.patch.yml` 末尾追加一行注释即可触发重载
+  （前提是上一步用的是链接；若 profile 里是副本，见下面的第 5 条）：
 
   ```powershell
   Add-Content "$HOME\.dsh\profiles\<profile>\cordis.patch.yml" "# reload prompt-enhance $(Get-Date -Format o)"
@@ -215,16 +216,37 @@ ln -s /absolute/path/to/dsh-prompt-enhance ~/.dsh/profiles/<profile>/node_module
 ### 4. 验证
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:2896/prompt-enhance/api/state
+Invoke-RestMethod http://127.0.0.1:<port>/prompt-enhance/api/state
 ```
 
-返回 `ok: true` 且带上 `provider` / `model` / `modes` / `methodologies` 就说明宿主半已挂载；
-刷新页面后输入框右侧应出现 ✨ 按钮。
+端口每次启动可能不同，以 Web GUI 的地址为准。返回 `ok: true` 且带上 `provider` / `model` /
+`modes` / `methodologies` 就说明宿主半已挂载；刷新页面后输入框右侧应出现 ✨ 按钮。
 
 卸载：从 `dsh.profile.bundles` 移除包名、删掉依赖与 junction，再触发一次重载。
 
 > 不想用链接？把整个目录复制进 `<profile>/node_modules/dsh-prompt-enhance` 也可以，
 > 代价是每次更新都要重新复制。
+
+### 5. 更新插件后看不到新功能？
+
+`dsh plugin install` / `pnpm install` 会把 `file:` 依赖**复制**进 profile 的 `node_modules`
+（连文件的修改时间一起保留）。之后你改了检出目录里的代码，profile 里那份副本仍是旧的，
+宿主重启也只会加载旧代码——症状是 `/prompt-enhance/api/state` 的 `version` 比
+`package.json` 里的版本旧，`modes` 也缺了新加的大类。
+
+确认与修复：
+
+```powershell
+$link = "$HOME\.dsh\profiles\<profile>\node_modules\dsh-prompt-enhance"
+(Get-Item $link).LinkType          # 为空 = 真实目录（陈旧副本）；Junction 才是链接
+Remove-Item $link -Recurse -Force
+New-Item -ItemType Junction -Path $link -Target "C:\absolute\path\to\dsh-prompt-enhance"
+Add-Content "$HOME\.dsh\profiles\<profile>\cordis.patch.yml" "# reload prompt-enhance $(Get-Date -Format o)"
+```
+
+等约 10 秒再看 `/state`：`version` 应等于 `package.json` 的版本，`modes` 里应出现
+`code` / `creative` / `doc`。**宿主半不需要重启**——重载注释会重新 import 链接目录里的文件；
+浏览器半再刷新一次页面即可。
 
 ## 使用
 
