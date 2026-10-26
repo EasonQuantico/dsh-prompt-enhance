@@ -1,4 +1,4 @@
-﻿# dsh-prompt-enhance bundle patch.
+# dsh-prompt-enhance bundle patch.
 # Registered through the profile's `dsh.profile.bundles` list; the row below is
 # what actually mounts the plugin into the composition.
 - insert:
@@ -11,6 +11,8 @@
         provider: ''
         model: ''
         maxPromptChars: 12000
+        # Document text budget for the doc-fill style.
+        maxDocumentChars: 16000
         maxWorkspaceBytes: 60000
         maxWorkspaceFiles: 40
         maxOutputTokens: 8000

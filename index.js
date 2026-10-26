@@ -21,7 +21,7 @@ import {
   selectMethodology,
 } from './strategies.js'
 
-export const VERSION = '1.0.0'
+export const VERSION = '1.1.0'
 /** `llm` is required for the enhance route; `webServer` is injected locally below. */
 export const inject = ['llm']
 const ROUTE_PREFIX = '/prompt-enhance/api'
@@ -34,6 +34,7 @@ const DEFAULTS = {
   maxPromptChars: 12000,
   maxWorkspaceBytes: 60000,
   maxWorkspaceFiles: 40,
+  maxDocumentChars: 16000,
   maxOutputTokens: 8000,
   requestTimeoutMs: 180000,
 }
@@ -65,6 +66,18 @@ const PRIORITY_NAMES = new Set([
   'server.js', 'server.ts', 'index.js', 'index.ts', 'main.go', 'main.rs', 'src/main.rs',
   'src/index.ts', 'src/index.js', 'src/app.ts', 'src/app.tsx',
 ])
+
+/** Formats `doc-fill` can read: plain text only, no office binaries. */
+const DOC_EXTENSIONS = new Set(['.md', '.mdx', '.markdown', '.txt', '.rst', '.adoc', '.org', '.tex'])
+
+/** Repo meta files are readable, but they are rarely the document being written. */
+const META_DOC_NAMES = new Set([
+  'readme.md', 'readme.zh.md', 'readme.en.md', 'readme.txt', 'changelog.md', 'license.md', 'license',
+  'license.txt', 'contributing.md', 'security.md', 'code_of_conduct.md', 'third_party_notices.md',
+  'authors.md', 'notice.md',
+])
+
+const DOC_LIMIT_BYTES = 512 * 1024
 
 const SECURITY_RULES = [
   { rule: 'dangerous-eval', re: /\beval\s*\(|new\s+Function\s*\(/, severity: 'high' },
@@ -378,6 +391,213 @@ async function collectWorkspace(root, limits) {
 }
 
 /* ------------------------------------------------------------------ */
+/* documents (doc mode)                                               */
+/* ------------------------------------------------------------------ */
+
+function isDocFile(name) {
+  return DOC_EXTENSIONS.has(extname(String(name || '')).toLowerCase())
+}
+
+/** Resolve a caller-supplied path against the root and refuse anything outside it. */
+function resolveInside(root, candidate) {
+  const value = String(candidate || '').trim()
+  if (!value) return null
+  const fullPath = resolve(root, value)
+  const relativePath = relative(root, fullPath)
+  if (!relativePath || relativePath.startsWith('..') || isAbsolute(relativePath)) return null
+  return { fullPath, relPath: normalizeSlashes(relativePath) }
+}
+
+/** Markdown ATX/setext headings, or numbered headings in plain-text documents. */
+function extractHeadings(text, ext) {
+  const lines = text.split('\n')
+  const markdown = ext === '.md' || ext === '.mdx' || ext === '.markdown'
+  const headings = []
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]
+    if (markdown) {
+      const atx = /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line)
+      if (atx) {
+        headings.push({ level: atx[1].length, text: atx[2].trim(), line: index + 1 })
+        continue
+      }
+      if (index + 1 < lines.length && line.trim() && !/^\s/.test(line)) {
+        const underline = lines[index + 1]
+        if (/^\s*={2,}\s*$/.test(underline)) headings.push({ level: 1, text: line.trim(), line: index + 1 })
+        else if (/^\s*-{3,}\s*$/.test(underline) && !/^\s*[-*+]\s/.test(line)) {
+          headings.push({ level: 2, text: line.trim(), line: index + 1 })
+        }
+      }
+      continue
+    }
+    const chinese = /^\s*([一二三四五六七八九十百]+)、\s*(\S.*)$/.exec(line)
+    if (chinese) {
+      headings.push({ level: 1, text: chinese[2].trim(), line: index + 1 })
+      continue
+    }
+    const numeric = /^\s*(\d+(?:\.\d+)*)[.、)]\s*(\S.*)$/.exec(line)
+    if (numeric) {
+      headings.push({ level: Math.min(6, numeric[1].split('.').length), text: numeric[2].trim(), line: index + 1 })
+    }
+  }
+  return headings
+}
+
+/** Observable formatting traits, so the model can keep writing in the same style. */
+function describeFormat(text, ext) {
+  const lines = text.split('\n')
+  const markdown = ext === '.md' || ext === '.mdx' || ext === '.markdown'
+  const tables = lines.filter((line) => line.includes('|') && /^[\s|:-]+$/.test(line) && /-{3,}/.test(line)).length
+  const codeBlocks = Math.floor(lines.filter((line) => /^\s*(```|~~~)/.test(line)).length / 2)
+  const orderedLists = lines.filter((line) => /^\s*\d+[.)]\s+\S/.test(line)).length
+  const unorderedLists = lines.filter((line) => /^\s*[-*+]\s+\S/.test(line)).length
+  const links = (text.match(/\[[^\]\n]+\]\([^)\n]+\)/g) || []).length
+  const bold = (text.match(/\*\*[^*\n]+\*\*/g) || []).length
+  const frontMatter = /^---\r?\n[\s\S]*?\r?\n---\r?\n/.test(text)
+  const chineseNumbering = (text.match(/^\s*[一二三四五六七八九十百]+、/gm) || []).length
+  const numericNumbering = (text.match(/^\s*\d+(?:\.\d+)*[.、)]\s/gm) || []).length
+  const numbering = chineseNumbering && numericNumbering ? '一、 与 1. 混用' : chineseNumbering ? '一、二、三、' : numericNumbering ? '1. / 1.1' : ''
+  const paragraphs = text
+    .split(/\n\s*\n/)
+    .map((block) => block.trim())
+    .filter(
+      (block) =>
+        block && !/^#{1,6}\s/.test(block) && !/^```/.test(block) && !/^\s*[-*+]\s/.test(block) && !/^\s*\d+[.)]\s/.test(block),
+    )
+  const avgParagraph = paragraphs.length ? Math.round(paragraphs.reduce((sum, block) => sum + block.length, 0) / paragraphs.length) : 0
+  const headings = extractHeadings(text, ext)
+  const maxDepth = headings.reduce((max, item) => Math.max(max, item.level), 0)
+  return {
+    headingStyle: markdown ? 'Markdown ATX（#）' : '纯文本 / 编号标题',
+    maxDepth,
+    tables,
+    codeBlocks,
+    orderedLists,
+    unorderedLists,
+    links,
+    bold,
+    frontMatter,
+    numbering,
+    avgParagraph,
+  }
+}
+
+async function readDocumentText(fullPath, maxChars) {
+  try {
+    const info = await stat(fullPath)
+    if (!info.isFile() || info.size > DOC_LIMIT_BYTES) return null
+    const text = await readFile(fullPath, 'utf8')
+    const chars = text.length
+    const truncated = chars > maxChars
+    return {
+      text: truncated ? `${text.slice(0, maxChars)}\n…（已截断 ${chars - maxChars} 字符）` : text,
+      chars,
+      truncated,
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Rank the readable documents of a workspace: a filename mentioned in the prompt
+ * wins, `docs/` beats repo meta files, and recently touched files break ties.
+ */
+async function listDocuments(root, prompt, limit = 24) {
+  const { files } = await walkFiles(root, { maxFiles: 800 })
+  const lowered = String(prompt || '').toLowerCase()
+  const month = 1000 * 60 * 60 * 24 * 30
+  const now = Date.now()
+  const scored = []
+  for (const rel of files) {
+    if (!isDocFile(rel)) continue
+    const name = basename(rel).toLowerCase()
+    if (IGNORED_FILE_RE.test(name)) continue
+    let info
+    try {
+      info = await stat(join(root, rel))
+    } catch {
+      continue
+    }
+    if (!info.isFile() || info.size > DOC_LIMIT_BYTES || info.size < 24) continue
+    const stem = name.replace(/\.[^.]+$/, '')
+    let score = 0
+    if (lowered && (lowered.includes(name) || (stem.length >= 3 && lowered.includes(stem)))) score += 6
+    if (rel.includes('/')) score += 1
+    if (/^docs?\//i.test(rel) || /\/docs?\//i.test(rel)) score += 1.5
+    if (META_DOC_NAMES.has(name)) score -= 4
+    score += Math.min(2, Math.max(0, (info.mtimeMs - (now - month)) / month) * 2)
+    if (info.size > 800 && info.size < 40000) score += 0.5
+    scored.push({ rel, score, size: info.size, mtimeMs: info.mtimeMs })
+  }
+  scored.sort((a, b) => b.score - a.score || b.mtimeMs - a.mtimeMs)
+  const documents = []
+  for (const item of scored.slice(0, limit)) {
+    const text = await readText(join(root, item.rel), 20000)
+    if (!text) continue
+    documents.push({
+      path: item.rel,
+      chars: text.length,
+      lines: text.split('\n').length,
+      headings: extractHeadings(text, extname(item.rel).toLowerCase()).length,
+      modified: new Date(item.mtimeMs).toISOString(),
+      score: Number(item.score.toFixed(2)),
+    })
+  }
+  return { documents, total: scored.length }
+}
+
+/**
+ * Build the document digest for `doc-fill`: outline, format traits, candidate
+ * list and the text itself (bounded by `limits.maxDocumentChars`).
+ */
+async function collectDocument(root, { docPath, prompt, limits }) {
+  const startedAt = Date.now()
+  const listed = await listDocuments(root, prompt)
+  let target = null
+  if (typeof docPath === 'string' && docPath.trim()) {
+    target = resolveInside(root, docPath)
+    if (!target) return { error: 'doc-outside-root' }
+    if (!isDocFile(target.relPath)) return { error: 'doc-unsupported' }
+  } else if (listed.documents.length) {
+    target = resolveInside(root, listed.documents[0].path)
+  }
+  if (!target) return { error: 'no-document' }
+
+  const document = await readDocumentText(target.fullPath, limits.maxDocumentChars)
+  if (!document) return { error: 'doc-unreadable' }
+
+  const ext = extname(target.relPath).toLowerCase()
+  const headings = extractHeadings(document.text, ext)
+  const format = describeFormat(document.text, ext)
+  const digest = {
+    kind: 'document',
+    root,
+    path: target.relPath,
+    ext: ext.replace(/^\./, ''),
+    chars: document.chars,
+    lines: document.text.split('\n').length,
+    headings: headings.slice(0, 120),
+    format,
+    text: document.text,
+    truncated: document.truncated,
+    candidates: listed.documents.slice(0, 8).map(({ path, chars }) => ({ path, chars })),
+  }
+  return {
+    digest,
+    info: {
+      path: target.relPath,
+      chars: document.chars,
+      headings: headings.length,
+      format,
+      truncated: document.truncated,
+    },
+    documents: listed.documents,
+    durationMs: Date.now() - startedAt,
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* model route                                                        */
 /* ------------------------------------------------------------------ */
 
@@ -443,7 +663,7 @@ export function apply(ctx, rawConfig = {}) {
     const value = rawConfig?.[key]
     if (value !== undefined && value !== null && value !== '') config[key] = value
   }
-  for (const key of ['maxPromptChars', 'maxWorkspaceBytes', 'maxWorkspaceFiles', 'maxOutputTokens', 'requestTimeoutMs']) {
+  for (const key of ['maxPromptChars', 'maxWorkspaceBytes', 'maxWorkspaceFiles', 'maxDocumentChars', 'maxOutputTokens', 'requestTimeoutMs']) {
     const numeric = Number(config[key])
     config[key] = Number.isFinite(numeric) && numeric > 0 ? numeric : DEFAULTS[key]
   }
@@ -452,6 +672,7 @@ export function apply(ctx, rawConfig = {}) {
     config,
     inflight: new Set(),
     cache: null,
+    docCache: null,
     routeCache: null,
     presence: [],
   }
@@ -484,6 +705,7 @@ export function apply(ctx, rawConfig = {}) {
     try {
       if (request.method === 'GET' && path === '/state') return await handleState(ctx, state, response)
       if (request.method === 'GET' && path === '/workspace') return await handleWorkspace(ctx, state, url, response)
+      if (request.method === 'GET' && path === '/documents') return await handleDocuments(ctx, state, url, response)
       if (request.method === 'POST' && path === '/presence') {
         const body = await readBody(request)
         record(body?.event, body?.detail)
@@ -546,6 +768,7 @@ async function handleState(ctx, state, response) {
       maxPromptChars: state.config.maxPromptChars,
       maxWorkspaceFiles: state.config.maxWorkspaceFiles,
       maxWorkspaceBytes: state.config.maxWorkspaceBytes,
+      maxDocumentChars: state.config.maxDocumentChars,
     },
     modes: MODES,
     focuses: FOCUSES,
@@ -582,6 +805,54 @@ async function handleWorkspace(ctx, state, url, response) {
   })
 }
 
+async function handleDocuments(ctx, state, url, response) {
+  const refresh = url.searchParams.get('refresh') === '1'
+  const requestedPath = url.searchParams.get('path') || ''
+  const prompt = (url.searchParams.get('prompt') || '').slice(0, 240)
+  const { root, source } = await resolveWorkspace(ctx, state.config, url.searchParams.get('cwd'))
+  const key = `${root}|${requestedPath}|${prompt}|${state.config.maxDocumentChars}`
+  const cached = state.docCache
+  if (!refresh && cached && cached.key === key && cached.at > Date.now() - 10000) {
+    return sendJson(response, 200, cached.value)
+  }
+
+  const startedAt = Date.now()
+  const listed = await listDocuments(root, prompt)
+  let selected = null
+  const chosenPath = requestedPath || (listed.documents.length ? listed.documents[0].path : '')
+  const target = chosenPath ? resolveInside(root, chosenPath) : null
+  if (target && isDocFile(target.relPath)) {
+    const document = await readDocumentText(target.fullPath, state.config.maxDocumentChars)
+    if (document) {
+      const ext = extname(target.relPath).toLowerCase()
+      const headings = extractHeadings(document.text, ext)
+      selected = {
+        path: target.relPath,
+        chars: document.chars,
+        lines: document.text.split('\n').length,
+        headings: headings.length,
+        truncated: document.truncated,
+        outline: headings.slice(0, 12).map(({ level, text: title, line }) => ({ level, text: title, line })),
+        format: describeFormat(document.text, ext),
+      }
+    }
+  }
+
+  const payload = {
+    ok: true,
+    root,
+    source,
+    cwd: root,
+    requested: requestedPath,
+    documents: listed.documents,
+    total: listed.total,
+    selected,
+    durationMs: Date.now() - startedAt,
+  }
+  state.docCache = { key, at: Date.now(), value: payload }
+  sendJson(response, 200, payload)
+}
+
 async function handleEnhance(ctx, state, request, response) {
   const config = state.config
   const body = await readBody(request)
@@ -592,12 +863,12 @@ async function handleEnhance(ctx, state, request, response) {
     return sendError(response, 413, 'prompt-too-long', `提示词过长（上限 ${config.maxPromptChars} 字符）`)
   }
 
-  const mode = body.mode === 'creative' ? 'creative' : body.mode === 'code' ? 'code' : ''
-  if (!mode) return sendError(response, 400, 'bad-mode', 'mode 必须是 code 或 creative')
+  const mode = MODES.some((entry) => entry.id === body.mode) ? body.mode : ''
+  if (!mode) return sendError(response, 400, 'bad-mode', 'mode 必须是 code、creative 或 doc')
 
   const variant = String(body.variant || '')
   if (!VARIANT_IDS.includes(variant)) return sendError(response, 400, 'bad-variant', `未知 variant：${variant}`)
-  if ((mode === 'code') !== variant.startsWith('code-')) return sendError(response, 400, 'mode-variant-mismatch', 'mode 与 variant 不匹配')
+  if (!variant.startsWith(`${mode}-`)) return sendError(response, 400, 'mode-variant-mismatch', 'mode 与 variant 不匹配')
 
   const focus = Array.isArray(body.focus) ? body.focus.filter((item) => FOCUS_IDS.includes(item)) : []
   if (variant.startsWith('code-') && focus.length === 0) return sendError(response, 400, 'empty-focus', '代码类至少选择一个优化方向')
@@ -612,6 +883,7 @@ async function handleEnhance(ctx, state, request, response) {
   const cwd = root
 
   let digest
+  let documentInfo = null
   if (variant === 'code-read') {
     const key = `${cwd}|${config.maxWorkspaceFiles}|${config.maxWorkspaceBytes}`
     const cached = state.cache
@@ -620,6 +892,21 @@ async function handleEnhance(ctx, state, request, response) {
       digest = await collectWorkspace(cwd, config)
       state.cache = { key, at: Date.now(), value: digest }
     }
+  } else if (variant === 'doc-fill') {
+    const collected = await collectDocument(cwd, { docPath: body.docPath, prompt, limits: config })
+    if (collected.error) {
+      const message =
+        collected.error === 'doc-outside-root'
+          ? '文档路径必须位于当前工作区内'
+          : collected.error === 'doc-unsupported'
+            ? '只支持 Markdown / 纯文本类文档（.md/.mdx/.txt/.rst/.adoc/.org/.tex）'
+            : collected.error === 'doc-unreadable'
+              ? '这个文档读不出来（可能过大或不是纯文本），请换一个'
+              : '当前工作区没有找到可补写的文档：请指定文档路径，或改用「按类型起草」'
+      return sendError(response, 400, collected.error, message)
+    }
+    digest = collected.digest
+    documentInfo = collected.info
   }
 
   const methodologyChoice = selectMethodology({ mode, variant, focus, prompt, requested })
@@ -674,9 +961,12 @@ async function handleEnhance(ctx, state, request, response) {
     methodologyReason: methodologyChoice.reason,
     workspaceRoot: root,
     workspaceSource: source,
-    workspaceFiles: digest ? digest.files.length : 0,
-    workspaceScanned: digest ? digest.fileCount : 0,
-    securityFindings: digest ? digest.security.findings.length : 0,
+    workspaceFiles: variant === 'code-read' && digest ? digest.files.length : 0,
+    workspaceScanned: variant === 'code-read' && digest ? digest.fileCount : 0,
+    securityFindings: variant === 'code-read' && digest ? digest.security.findings.length : 0,
+    documentPath: documentInfo ? documentInfo.path : '',
+    documentChars: documentInfo ? documentInfo.chars : 0,
+    documentHeadings: documentInfo ? documentInfo.headings : 0,
     startedAt: Date.now(),
   })
 

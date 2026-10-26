@@ -271,9 +271,10 @@ test('/state reports the route, workspace and vocabulary', async () => {
     assert.equal(body.model, 'test-model')
     assert.equal(body.modelSource, 'config')
     assert.equal(body.limits.maxPromptChars, 200)
+    assert.equal(body.limits.maxDocumentChars, 16000)
     assert.deepEqual(
       body.modes.map((mode) => mode.id),
-      ['code', 'creative'],
+      ['code', 'creative', 'doc'],
     )
     assert.equal(body.methodologies.length, 5)
     assert.equal(body.methodologies[0].id, 'auto')
@@ -604,4 +605,200 @@ test('/cancel is idempotent with no jobs in flight', async () => {
   })
   assert.equal(response.statusCode, 200)
   assert.deepEqual(response.json(), { ok: true, cancelled: 0 })
+})
+
+/* ------------------------------------------------------------------ */
+/* /documents                                                         */
+/* ------------------------------------------------------------------ */
+
+test('/documents lists readable documents and outlines the automatic pick', async () => {
+  const root = await makeFixture()
+  try {
+    const { handler } = mount({ projects: null })
+    const response = await call(handler, {
+      url: `/prompt-enhance/api/documents?refresh=1&cwd=${encodeURIComponent(root)}`,
+    })
+    const body = response.json()
+
+    assert.equal(response.statusCode, 200)
+    assert.equal(body.ok, true)
+    assert.equal(body.root, root)
+    assert.equal(body.source, 'session')
+    assert.deepEqual(
+      body.documents.map((entry) => entry.path),
+      ['README.md'],
+    )
+    assert.equal(body.total, 1)
+    assert.ok(body.selected)
+    assert.equal(body.selected.path, 'README.md')
+    assert.ok(body.selected.chars > 0)
+    assert.equal(body.selected.headings, 1)
+    assert.deepEqual(
+      body.selected.outline.map((item) => item.text),
+      ['fixture'],
+    )
+    assert.match(body.selected.format.headingStyle, /ATX/)
+    // Listing stays small: the document body never leaves the host.
+    assert.equal('text' in body, false)
+    assert.equal('selected' in body && 'text' in body.selected, false)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('/documents honours an explicit path and ignores paths outside the workspace', async () => {
+  const root = await makeFixture()
+  try {
+    await mkdir(join(root, 'docs'), { recursive: true })
+    await writeFile(join(root, 'docs', 'guide.md'), '# 指南\n\n## 安装\n\n待补充。\n')
+    const { handler } = mount({ projects: null })
+
+    const inside = await call(handler, {
+      url: `/prompt-enhance/api/documents?cwd=${encodeURIComponent(root)}&path=docs%2Fguide.md`,
+    })
+    const body = inside.json()
+    assert.equal(body.selected.path, 'docs/guide.md')
+    assert.deepEqual(
+      body.selected.outline.map((item) => item.text),
+      ['指南', '安装'],
+    )
+    assert.ok(body.documents.some((entry) => entry.path === 'docs/guide.md'))
+
+    const outside = await call(handler, {
+      url: `/prompt-enhance/api/documents?cwd=${encodeURIComponent(root)}&path=..%2Fescape.md`,
+    })
+    assert.equal(outside.statusCode, 200)
+    assert.equal(outside.json().selected, null)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+/* ------------------------------------------------------------------ */
+/* /enhance doc mode                                                  */
+/* ------------------------------------------------------------------ */
+
+test('/enhance doc-fill reads the document and frames it as evidence', async () => {
+  const root = await makeFixture()
+  try {
+    await mkdir(join(root, 'docs'), { recursive: true })
+    await writeFile(join(root, 'docs', 'guide.md'), '# 指南\n\n## 安装\n\n目前只有在线安装。\n\n## 常见问题\n\n待补充。\n')
+    const { stream, calls } = recordingStream([
+      { type: 'text-delta', text: '# 指南\n\n## 安装\n\n### 离线安装\n\n' },
+      { type: 'finish', reason: { kind: 'stop' } },
+      { type: 'usage', usage: { inputTokens: 30, outputTokens: 40 } },
+    ])
+    const { handler } = mount({ projects: null, stream })
+    const response = await call(handler, {
+      method: 'POST',
+      url: '/prompt-enhance/api/enhance',
+      headers: { 'sec-fetch-site': 'same-origin' },
+      body: {
+        prompt: '给安装章节补上离线安装，并在常见问题里补两条',
+        mode: 'doc',
+        variant: 'doc-fill',
+        cwd: root,
+      },
+    })
+    const events = response.sse()
+    const meta = events.find((item) => item.event === 'meta').data
+
+    assert.equal(response.statusCode, 200)
+    assert.equal(meta.mode, 'doc')
+    assert.equal(meta.variant, 'doc-fill')
+    assert.equal(meta.documentPath, 'docs/guide.md')
+    assert.ok(meta.documentChars > 0)
+    assert.equal(meta.documentHeadings, 3)
+    // Document digests are not workspace scans.
+    assert.equal(meta.workspaceFiles, 0)
+    assert.equal(meta.securityFindings, 0)
+    assert.equal(meta.methodology, 'langgpt')
+
+    const done = events.find((item) => item.event === 'done')
+    assert.equal(done.data.finish, 'stop')
+
+    const payload = calls[0].messages[0].content[0].text
+    assert.match(payload, /^<增强指令>\n/)
+    assert.match(payload, /<用户原提示词>\n给安装章节补上离线安装，并在常见问题里补两条\n<\/用户原提示词>$/)
+    assert.ok(payload.includes('本次增强：文档类 / doc-fill'))
+    assert.ok(payload.includes('## 文档摘要'))
+    assert.ok(payload.includes('### 现有框架（标题大纲）'))
+    assert.ok(payload.includes('### 格式特征'))
+    assert.ok(payload.includes('文档类补充要求'))
+    assert.ok(payload.includes('## 常见问题'))
+    // Code-only instructions must not leak into document mode.
+    assert.equal(payload.includes('## 工作区摘要'), false)
+    assert.equal(payload.includes('开发框架维度必须覆盖'), false)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('/enhance doc-draft needs no document and says so in the digest slot', async () => {
+  const { stream, calls } = recordingStream([{ type: 'text-delta', text: '# 季度复盘\n' }, { type: 'finish', reason: { kind: 'stop' } }])
+  const { handler } = mount({ stream })
+  const response = await call(handler, {
+    method: 'POST',
+    url: '/prompt-enhance/api/enhance',
+    headers: { 'sec-fetch-site': 'same-origin' },
+    body: { prompt: '写一份季度复盘文档', mode: 'doc', variant: 'doc-draft' },
+  })
+  const meta = response.sse().find((item) => item.event === 'meta').data
+  assert.equal(meta.documentPath, '')
+  assert.equal(meta.documentChars, 0)
+  assert.equal(meta.methodology, 'langgpt')
+  const payload = calls[0].messages[0].content[0].text
+  assert.ok(payload.includes('本次增强：文档类 / doc-draft'))
+  assert.equal(payload.includes('## 文档摘要'), false)
+})
+
+test('doc-fill error codes are explicit 400s', async () => {
+  const root = await makeFixture()
+  const empty = await mkdtemp(join(tmpdir(), 'pe-empty-'))
+  try {
+    const { handler } = mount({ projects: null })
+    const post = (body) =>
+      call(handler, {
+        method: 'POST',
+        url: '/prompt-enhance/api/enhance',
+        headers: { 'sec-fetch-site': 'same-origin' },
+        body: { mode: 'doc', variant: 'doc-fill', ...body },
+      })
+
+    const outside = await post({ prompt: '补写', cwd: root, docPath: '../escape.md' })
+    assert.equal(outside.statusCode, 400)
+    assert.equal(outside.json().error.code, 'doc-outside-root')
+
+    const unsupported = await post({ prompt: '补写', cwd: root, docPath: 'package.json' })
+    assert.equal(unsupported.statusCode, 400)
+    assert.equal(unsupported.json().error.code, 'doc-unsupported')
+
+    const missing = await post({ prompt: '补写', cwd: empty })
+    assert.equal(missing.statusCode, 400)
+    assert.equal(missing.json().error.code, 'no-document')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+    await rm(empty, { recursive: true, force: true })
+  }
+})
+
+test('doc variants reject a mismatched mode and accept the code focuses check', async () => {
+  const { handler } = mount()
+  const mismatch = await call(handler, {
+    method: 'POST',
+    url: '/prompt-enhance/api/enhance',
+    headers: { 'sec-fetch-site': 'same-origin' },
+    body: { prompt: '补写', mode: 'doc', variant: 'code-read' },
+  })
+  assert.equal(mismatch.statusCode, 400)
+  assert.equal(mismatch.json().error.code, 'mode-variant-mismatch')
+
+  const badMode = await call(handler, {
+    method: 'POST',
+    url: '/prompt-enhance/api/enhance',
+    headers: { 'sec-fetch-site': 'same-origin' },
+    body: { prompt: '补写', mode: 'design', variant: 'doc-fill' },
+  })
+  assert.equal(badMode.statusCode, 400)
+  assert.equal(badMode.json().error.code, 'bad-mode')
 })

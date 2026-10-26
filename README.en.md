@@ -17,7 +17,7 @@ verifiable prompt — written straight into the input box.
 - **Four methodologies, auto-selected**: Superpowers / Prompt Optimizer / LangGPT / AiShort techniques scored per scenario, or pick one manually.
 - **Only writes to the composer** — it never sends a message, and every workspace access is read-only.
 
-![The ✨ Prompt Enhance button and panel: pick code or creative, then a refinement style](docs/images/ui-composer.png)
+![The ✨ Prompt Enhance button and panel: pick code, creative or documentation, then a refinement style](docs/images/ui-composer.png)
 
 [中文 README](README.md) · [Internal contract](CONTRACT.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md)
 
@@ -27,7 +27,7 @@ verifiable prompt — written straight into the input box.
 
 - [Features](#features)
 - [At a glance](#at-a-glance)
-- [The four refinement styles](#the-four-refinement-styles)
+- [The six refinement styles](#the-six-refinement-styles)
 - [Methodology selection](#methodology-selection)
 - [Installation](#installation)
 - [Usage](#usage)
@@ -46,19 +46,21 @@ verifiable prompt — written straight into the input box.
 | Capability | Description |
 | --- | --- |
 | Persistent button | A pill button in the composer's right-hand control row, present in both the hero and in-session composer |
-| Two families, four styles | Code (read the workspace / prompt-only) and creative (enrich / tighten the structure) |
+| Three families, six styles | Code (read the workspace / prompt-only), creative (enrich / tighten the structure) and documentation (fill in an existing document / draft from a template) |
 | Two code focuses | "Improve the development framework" and "Review security", multi-select, at least one |
 | Methodology routing | Four upstream techniques plus `auto` scoring; a dropdown pins one if you disagree |
 | Workspace evidence | Directory tree, manifest summary, prioritised file excerpts, 10 heuristic security findings |
+| Document evidence | Outline first: heading levels, tables, lists, numbering and paragraph length, so additions fit the existing structure |
 | Streaming UI | SSE deltas; first shows “model is thinking… (N chars)” then types the result out |
 | One-click landing | Replace composer / insert at caret / copy / retry; the result box is editable before applying |
-| Preference memory | Last family, style, focus and methodology are remembered in `localStorage` |
+| Preference memory | Last family, style, focus, methodology and document are remembered in `localStorage` |
 | Diagnostic breadcrumbs | The browser half reports mount/open/start/apply events to the host for console-free debugging |
 
 ## At a glance
 
-> These three images are **mockups drawn from `client.js`'s real layout and copy**, not screenshots.
-> Paths, file names and model names in them are examples.
+> Of the five images below, four UI mockups are **drawn from `client.js`'s real layout and copy**, not
+> screenshots; the last one diagrams what the document digest carries. Paths, file names and model names
+> in them are examples.
 
 ### The button lives in the composer's control row
 
@@ -72,8 +74,8 @@ verifiable prompt — written straight into the input box.
 
 ![The enhancement panel: family tabs, style cards, focuses, methodology, workspace evidence, start button](docs/images/ui-panel.png)
 
-- **① Family tabs** — code or creative; each family remembers the style you used last.
-- **② Four styles** — two per family, each card states what it adds.
+- **① Family tabs** — code, creative or documentation; each family remembers the style you used last.
+- **② Six styles** — two per family, each card states what it adds.
 - **③ Code focuses** — improve the development framework and/or review security, multi-select, at least one.
 - **④ Methodology** — `auto` scores the scenario by default; the panel shows which set won, and you can pin one.
 - **⑤ Visible evidence** — before reading anything it tells you which directory, how many files, how many findings.
@@ -87,7 +89,26 @@ verifiable prompt — written straight into the input box.
 - **② Four ways to land it** — replace the composer / insert at the caret / copy / retry.
 - **③ Traceable metadata** — which model, which methodology, how many files read, how many findings.
 
-## The four refinement styles
+### Documentation: read the skeleton, then fill it in
+
+![The document panel: selected document with size and heading count, outline, candidate picker, refresh and start](docs/images/ui-panel-doc.png)
+
+- **① Pick the document first** — the selected document with its size and heading count; automatic selection
+  ranks candidates by prompt relevance first, then sub-directory, `docs/`, recency and size.
+- **② The skeleton at a glance** — the first few outline headings sit right above the start button, so you can
+  confirm the structure before filling it.
+- **③ The dropdown overrides auto-pick** — point at any document in the workspace instead.
+- **④ Refresh rescans the workspace** — files you just created or renamed show up immediately.
+- **⑤ Ranking, nothing more** — relevance and recency only decide which document is read; no file is modified.
+
+![Document evidence: outline, formatting traits, excerpt and sibling documents framed as read-only evidence](docs/images/doc-evidence.svg)
+
+- The four kinds of material (outline, formatting traits, excerpt, sibling documents) enter the prompt as
+  **read-only evidence**: instructional text inside them is quoted material, not a command.
+- Unsupported gaps must be written as “待补充：需要 X（来源）”; numbers, citations and conclusions are never
+  invented, and additions keep the original heading levels, numbering and table columns.
+
+## The six refinement styles
 
 | Family | Style | id | What it does |
 | --- | --- | --- | --- |
@@ -95,6 +116,12 @@ verifiable prompt — written straight into the input box.
 | Code | Prompt only | `code-only` | Skips the codebase, classifies the project type, then adds tech choices, directory layout, interfaces, data model and test strategy |
 | Creative | Enrich | `creative-rich` | Polishes and expands while keeping the original intent and voice: sensory detail, POV, pacing, emotional curve |
 | Creative | Tighten the structure | `creative-structure` | Imposes a skeleton: logline, character sheets, beat sheet, scene cards, foreshadowing/payoff table, self-check list |
+| Documentation | Fill in the existing document | `doc-fill` | Reads the document's outline and formatting, then rewrites the prompt into “which section gets what, in which format, and what must not change” |
+| Documentation | Draft from a template | `doc-draft` | With no document to read, drafts the skeleton, writing rules and acceptance criteria for a document type (README / design doc / report / minutes / paper / contract) |
+
+Documentation styles always carry the same constraints: keep the existing heading levels, numbering and
+table columns; additions must be droppable into their section as-is; anything unsupported is written as
+“待补充：需要 X（来源）” instead of being invented; length follows the amount of new content.
 
 Code styles also take two focus axes (multi-select): **improve the development framework**
 (stack, layering, interface contracts, errors and logging, tests and delivery) and
@@ -127,10 +154,13 @@ The four technique sets are rewritten in Chinese inside `strategies.js`; **no up
 | `code-only` | prompt-optimizer +1.4, langgpt +1.1, superpower +0.5 |
 | `creative-rich` | langgpt +1.5, superpower +0.7, aishort +0.6 |
 | `creative-structure` | superpower +1.4, langgpt +1.1 (+1.0 more when the draft mentions scripts, outlines or episodes) |
+| `doc-fill` | langgpt +1.5, prompt-optimizer +1.0, superpower +0.7 (+0.6 more for tables, contents or numbering; prompt-optimizer +0.8 more for data, citations or sources) |
+| `doc-draft` | langgpt +1.4, superpower +1.0, prompt-optimizer +0.8 (+0.6 more for aishort when the draft is under 90 characters) |
 
-![Methodology routing: the weighted matrix of four styles × four technique sets](docs/images/methodology.svg)
+![Methodology routing: the weighted matrix of six styles × four technique sets](docs/images/methodology.svg)
 
-Measured picks: `superpower` / `prompt-optimizer` / `langgpt` / `superpower` for the four styles.
+Measured picks: `superpower` / `prompt-optimizer` / `langgpt` / `superpower` / `langgpt` /
+`langgpt` for the six styles (the last two are the documentation styles).
 Sources, licence discrepancies and the “why no upstream text was merged” rationale live in
 [`docs/research/prompt-sources.md`](docs/research/prompt-sources.md) and
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
@@ -208,7 +238,8 @@ trigger one reload.
 ## Usage
 
 1. Type a draft in the composer, e.g. “a small tool that batch-renames images”.
-2. Click ✨, pick *code* or *creative*, then a style; for code styles tick the focuses (both by default).
+2. Click ✨, pick *code*, *creative* or *documentation*, then a style; for code styles tick the focuses
+   (both by default).
 3. Leave the methodology on “auto (recommended)”, or pin one.
 4. Hit **Enhance**. The result streams in; use **Replace composer**, **Insert at caret**, **Copy** or **Retry**.
 
@@ -220,6 +251,10 @@ Tips:
   findings — check that it read the directory you meant.
 - The first `code-read` is slower (workspace scan plus reasoning); with `deepseek-v4.1-flash` the
   first byte arrived in 7–28 s in our tests.
+- With `doc-fill`, check the “document” line first: is it the file you meant, and do the character and
+  heading counts look right? Automatic selection ranks by prompt relevance; open the dropdown to switch.
+  Naming the section in your draft works best, e.g. “add concurrency and timeout entries to the
+  Known limitations section of the README”.
 - The enhanced prompt is only **written into the composer**; edit it further and send it yourself.
 
 ## Configuration
@@ -233,6 +268,7 @@ The `config` block of the `prompt-enhance` row in `cordis.patch.yml`:
 | `maxPromptChars` | `12000` | Draft character limit; larger drafts get 413 |
 | `maxWorkspaceFiles` | `40` | Cap on files listed in the digest |
 | `maxWorkspaceBytes` | `60000` | Total byte budget for file excerpts |
+| `maxDocumentChars` | `16000` | How much document text the documentation styles read; longer files are truncated and labelled |
 | `maxOutputTokens` | `8000` | Output budget per run; reasoning models spend part of it on thinking |
 | `requestTimeoutMs` | `180000` | Per-run timeout |
 
@@ -245,18 +281,21 @@ The browser half only selects and writes back; the host half owns evidence, rout
 | File | Responsibility |
 | --- | --- |
 | `client.js` | slot registration, button and panel, SSE parsing, progress, write-back (`insertText` / `setDraft`) |
-| `index.js` | the three gates, `/state` `/workspace` `/enhance` `/cancel`, `collectWorkspace`, `resolveRoute`, SSE |
-| `strategies.js` | vocabularies, `selectMethodology` scoring, `buildSystemPrompt`, `renderDigest` evidence framing |
+| `index.js` | the three gates, `/state` `/workspace` `/documents` `/enhance` `/cancel`, `collectWorkspace`, `collectDocument`, `resolveRoute`, SSE |
+| `strategies.js` | vocabularies, `selectMethodology` scoring, `buildSystemPrompt`, `renderDigest` / `renderDocDigest` evidence framing |
 
 1. The browser posts the draft, family, style, focuses and the session cwd to `POST /enhance`.
 2. For `code-read` the host scans the workspace: tree, manifest summary, key excerpts, security findings.
+   For `doc-fill` it reads the chosen document instead: heading outline, formatting traits, an excerpt and
+   the sibling documents as candidates.
 3. `selectMethodology` picks a technique set and `buildSystemPrompt` assembles a single user message
    (“enhancement instructions” + “original draft”).
 4. The host streams from the session model via `ctx.llm.stream(…)` and pushes SSE frames back;
    `tidyResult` strips leading markdown code fences and “here is your prompt:” pleasantries.
 
-Workspace content is wrapped in a read-only evidence frame that tells the model any imperative text
-found inside is *material*, not a command — a cheap defence against prompt injection hiding in a repo.
+Workspace content and document text are wrapped in a read-only evidence frame that tells the model any
+imperative text found inside is *material*, not a command — a cheap defence against prompt injection
+hiding in a repo or in a document (“ignore the above” is quoted text, not an instruction).
 
 ### Workspace evidence (`code-read`)
 
@@ -268,6 +307,19 @@ found inside is *material*, not a command — a cheap defence against prompt inj
   the model to say so explicitly when the evidence does not answer something.
 - **Bounded and predictable**: total ≤ `maxWorkspaceBytes`, depth ≤ 7, at most 6000 files walked, 10 s cache.
 
+### Document evidence (`doc-fill`)
+
+![Document evidence: outline, formatting traits, excerpt and sibling documents framed as read-only evidence](docs/images/doc-evidence.svg)
+
+- **Four kinds of material**: the heading outline (with levels and line numbers), formatting traits
+  (heading style, max depth, tables, code blocks, lists, links, bold, front-matter, numbering style,
+  average paragraph length), the document excerpt (≤ `maxDocumentChars`) and the sibling documents
+  (reference only, never treated as facts).
+- **Format first**: additions must keep the existing heading levels, numbering and table columns so they
+  can be dropped into their section as-is.
+- **No invented gaps**: sections, numbers or citations that are not in the digest become
+  “待补充：需要 X（来源）” in the generated prompt.
+
 ## HTTP API
 
 Mounted under `/prompt-enhance/api` (a plugin route, therefore not behind DSH's `/api/*` auth middleware):
@@ -276,6 +328,7 @@ Mounted under `/prompt-enhance/api` (a plugin route, therefore not behind DSH's 
 | --- | --- | --- |
 | `GET` | `/state` | Version, model route, workspace, vocabularies, methodology catalogue, breadcrumbs |
 | `GET` | `/workspace?refresh=1&cwd=…` | Read-only workspace scan: file list and security findings |
+| `GET` | `/documents?refresh=1&cwd=…&prompt=…&path=…` | Lists readable documents and outlines the one that would be read |
 | `POST` | `/enhance` | Start an enhancement, `text/event-stream` (`meta`/`status`/`delta`/`done`/`error`) |
 | `POST` | `/cancel` | Abort the in-flight run |
 | `POST` | `/presence` | Browser breadcrumbs (diagnostics only) |
@@ -293,6 +346,8 @@ Write endpoints require a loopback socket, a same-origin (or absent) `sec-fetch-
 - **Where your data goes**: the draft and workspace excerpts are sent to whichever model provider DSH
   currently selects. The plugin itself has no telemetry and makes no outbound requests.
 - **Never auto-sends**: results only land in the composer.
+- **Documents stay inside the root**: `docPath` is resolved back into the workspace (`doc-outside-root`
+  otherwise) and only text extensions are accepted; document text is framed as read-only evidence too.
 - Cross-site pages cannot drive it: no wildcard CORS, and the three write gates above; see [SECURITY.md](SECURITY.md).
 
 ## Development and tests
@@ -342,6 +397,10 @@ Contribution rules (encoding, commit format, PR checklist) are in [CONTRIBUTING.
   for the model, not an audit report.
 - `code-read` excerpts the top 10 files by priority, ≤ 60 KB total; very large repositories are only
   partially covered.
+- The documentation styles read plain-text formats only (`.md`, `.mdx`, `.txt`, `.rst`, `.adoc`, `.org`,
+  `.tex`); `.docx` and `.pdf` are not parsed — convert them first or use “draft from a template”.
+- Document filling covers the excerpt that fits `maxDocumentChars` (16 000 characters by default); the
+  digest says “truncated” when a file is longer.
 - Quality depends on the selected model; reasoning models can take 7–28 s to first byte — use “Stop” if needed.
 - A blank page with no `sessionId` has no composer control row, so no button is rendered until you enter a session.
 - Verified on the DSH Web GUI only; the Electron IPC form is untested.

@@ -18,19 +18,20 @@ import {
 
 const METHODOLOGY_IDS = ['superpower', 'langgpt', 'aishort', 'prompt-optimizer']
 
-test('two modes, four variants, labels are localised', () => {
+test('three modes, six variants, labels are localised', () => {
   assert.deepEqual(
     MODES.map((mode) => mode.id),
-    ['code', 'creative'],
+    ['code', 'creative', 'doc'],
   )
   assert.deepEqual(
     MODES.map((mode) => mode.variants.map((variant) => variant.id)),
     [
       ['code-read', 'code-only'],
       ['creative-rich', 'creative-structure'],
+      ['doc-fill', 'doc-draft'],
     ],
   )
-  assert.deepEqual(VARIANT_IDS, ['code-read', 'code-only', 'creative-rich', 'creative-structure'])
+  assert.deepEqual(VARIANT_IDS, ['code-read', 'code-only', 'creative-rich', 'creative-structure', 'doc-fill', 'doc-draft'])
 
   for (const mode of MODES) {
     assert.ok(mode.label, `mode ${mode.id} needs a label`)
@@ -206,4 +207,78 @@ test('empty scan result says so instead of claiming safety', () => {
   })
   assert.ok(text.includes('未命中内置启发式规则'))
   assert.ok(text.includes('不代表没有风险'))
+})
+
+test('doc variants route to a structural methodology', () => {
+  const fill = selectMethodology({ mode: 'doc', variant: 'doc-fill', prompt: '把安装章节补全，保持表格列与编号不变' })
+  assert.equal(fill.id, 'langgpt')
+
+  const draft = selectMethodology({ mode: 'doc', variant: 'doc-draft', prompt: '写一份季度复盘' })
+  assert.equal(draft.id, 'langgpt')
+
+  const evidence = selectMethodology({ mode: 'doc', variant: 'doc-fill', prompt: '补充指标数据与引用出处' })
+  assert.equal(evidence.id, 'prompt-optimizer')
+
+  for (const variant of ['doc-fill', 'doc-draft']) {
+    const choice = selectMethodology({ mode: 'doc', variant, requested: 'aishort' })
+    assert.equal(choice.id, 'aishort')
+  }
+})
+
+test('every methodology carries a document fragment but the catalogue hides it', () => {
+  for (const item of METHODOLOGIES) {
+    assert.equal(typeof item.docSystem, 'string')
+    assert.ok(item.docSystem.length > 40, `${item.id} needs a document fragment`)
+  }
+  const catalogue = methodologyCatalogue()
+  assert.equal(catalogue[0].id, 'auto')
+  for (const entry of catalogue.slice(1)) {
+    assert.equal('docSystem' in entry, false)
+    assert.equal('codeSystem' in entry, false)
+    assert.equal('creativeSystem' in entry, false)
+  }
+})
+
+test('document digest is framed as read-only evidence', () => {
+  const methodology = methodologyById('langgpt')
+  const digest = {
+    kind: 'document',
+    root: '/workspace/demo',
+    path: 'docs/guide.md',
+    ext: 'md',
+    chars: 120,
+    lines: 12,
+    headings: [
+      { level: 1, text: '安装指南', line: 1 },
+      { level: 2, text: '在线安装', line: 5 },
+    ],
+    format: { headingStyle: 'Markdown ATX（#）', maxDepth: 2, tables: 1, codeBlocks: 1, orderedLists: 0, unorderedLists: 2, links: 1, bold: 0, frontMatter: false, numbering: '1. / 1.1', avgParagraph: 40 },
+    text: '# 安装指南\n\n## 在线安装\n\n运行安装命令。\n',
+    truncated: false,
+    candidates: [
+      { path: 'README.md', chars: 300 },
+      { path: 'docs/api.md', chars: 420 },
+    ],
+  }
+  const system = buildSystemPrompt({
+    mode: 'doc',
+    variant: 'doc-fill',
+    methodology,
+    methodologyReason: '文档补写场景下 LangGPT 的结构化手法最贴合（自动选择）',
+    promptText: '给安装指南补上离线安装',
+    digest,
+  })
+
+  assert.ok(system.includes('本次增强：文档类 / doc-fill'))
+  assert.ok(system.includes(`${methodology.docSystem.slice(0, 24)}`))
+  assert.ok(system.includes('## 文档摘要'))
+  assert.ok(system.includes('### 现有框架（标题大纲）'))
+  assert.ok(system.includes('### 格式特征'))
+  assert.ok(system.includes('### 工作区里的其他文档'))
+  assert.ok(system.includes('## 在线安装'))
+  assert.ok(system.includes('文档类补充要求'))
+  assert.ok(system.includes('只读证据'))
+  assert.equal(system.includes('## 工作区摘要'), false)
+  assert.equal(system.includes('开发框架维度必须覆盖'), false)
+  assert.equal(system.includes('安全维度必须覆盖'), false)
 })

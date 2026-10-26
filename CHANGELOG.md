@@ -6,12 +6,35 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-10-26
+
+Third family, documentation mode.
+
+### Added
+
+- Documentation family (文档): `doc-fill` reads the current document's heading outline and
+  formatting traits and rewrites the prompt so the model fills the gaps inside that structure;
+  `doc-draft` drafts a document-type skeleton when there is nothing to read.
+- `GET /prompt-enhance/api/documents` lists readable documents, ranks them by prompt relevance,
+  sub-directory, `docs/`, recency and size, and returns the outline plus formatting traits of the
+  document that would be read. `POST /enhance` accepts `docPath` and reports
+  `documentPath` / `documentChars` / `documentHeadings` in the `meta` event.
+- Document evidence framing (`renderDocDigest`): outline, formatting traits, excerpt and sibling
+  documents are injected as read-only evidence; unsupported gaps must be written as
+  “待补充：需要 X（来源）”.
+- `docSystem` fragments for all four methodologies, so document work still routes through the
+  same adaptive scoring (`doc-fill` → LangGPT, `doc-draft` → LangGPT in the measured cases).
+- `maxDocumentChars` config (default 16000) and the `doc-outside-root` / `doc-unsupported` /
+  `doc-unreadable` / `no-document` validation codes.
+- Document line in the panel (selected path, size, heading count, outline preview, candidate
+  picker, refresh) and `document*` metadata in the result footer.
+
 ### Docs
 
-- README (both languages) now leads with six illustrations: three UI mockups drawn from
-  `client.js` (button, panel, result) and three diagrams (request chain, methodology scoring
-  matrix, workspace evidence). Generators live in `docs/images/`; the mockups are labelled as
-  mockups, not screenshots.
+- README (both languages) now leads with eight illustrations: four UI mockups drawn from
+  `client.js` (button, panel, document panel, result) and four diagrams (request chain, methodology
+  scoring matrix, workspace evidence, document evidence). Generators live in `docs/images/`; the
+  mockups are labelled as mockups, not screenshots.
 
 ## [1.0.0] — 2026-10-25
 

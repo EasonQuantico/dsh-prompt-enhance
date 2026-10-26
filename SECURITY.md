@@ -28,6 +28,10 @@ What the plugin does about them:
 - Workspace content is read-only, size-capped (`maxWorkspaceBytes`, `maxWorkspaceFiles`)
   and inserted into the prompt inside an explicitly labelled "read-only evidence" frame
   telling the model that instructions found in the workspace are material, not commands.
+- Documents read in the `doc-fill` style go through the same frame and two extra checks:
+  `docPath` is resolved back inside the workspace root (`doc-outside-root` otherwise), and
+  only text extensions are accepted (`doc-unsupported`), with the excerpt capped by
+  `maxDocumentChars`. `.docx`/`.pdf` are never parsed, so no binary parser is exposed.
 - The enhancer only writes text back into the composer draft; it never submits a message
   and never executes code it read.
 
@@ -41,5 +45,5 @@ What it explicitly does **not** protect against:
 
 ## Supported versions
 
-The latest release on `main` receives fixes. This plugin is pre-1.0 in spirit: pin a
-commit if you need reproducibility.
+The latest release on `main` receives fixes. This plugin is still young: pin a commit if
+you need reproducibility.

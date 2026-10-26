@@ -176,6 +176,16 @@ test('render body tolerates missing slot props', () => {
   assert.ok(classes.some((name) => name.includes('dpe-trigger')))
 })
 
+test('browser half offers the documentation family', () => {
+  assert.ok(source.includes("tabDoc: '文档'"), 'the third family has a tab label')
+  assert.ok(source.includes("'doc-fill'") && source.includes("'doc-draft'"), 'both document styles are selectable')
+  assert.ok(source.includes("doc: 'doc-fill'"), 'document mode defaults to reading the current document')
+  assert.ok(source.includes('label: LABELS.documentPick') || source.includes('LABELS.documentPick'), 'candidate picker is labelled')
+  assert.ok(source.includes('dpe-select'), 'the document picker reuses the panel select style')
+  assert.ok(source.includes('docPath'), 'the chosen document is sent with the request')
+  assert.ok(source.includes('documentMissing'), 'a workspace without documents explains itself')
+})
+
 test('browser half obeys the plugin rules', () => {
   assert.equal(/require\(['"]@deepseek-ai\//.test(source), false, 'must not require harness client packages')
   assert.equal(/import\s+[^'"]*from\s+['"]@deepseek-ai\//.test(source), false, 'must not import harness packages')

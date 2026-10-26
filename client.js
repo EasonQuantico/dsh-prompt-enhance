@@ -3,9 +3,9 @@
  *
  * Registers one component on the `conversation.input.right` slot — the control
  * row inside the composer that exists in both the hero and the in-session
- * variant: a compact "提示词增强" pill that opens a popover with the two
- * enhancement families (code / creative), their variants, and the adaptive
- * methodology selector.
+ * variant: a compact "提示词增强" pill that opens a popover with the three
+ * enhancement families (code / creative / doc), their variants, and the
+ * adaptive methodology selector.
  *
  * The component talks to the host half over `/prompt-enhance/api` (JSON + SSE).
  */
@@ -29,6 +29,7 @@ window.__ModuleLoader__.load({
       close: '关闭',
       tabCode: '代码',
       tabCreative: '创作',
+      tabDoc: '文档',
       focusTitle: '优化方向',
       focusHint: '至少选择一项',
       methodology: '方法论',
@@ -38,6 +39,15 @@ window.__ModuleLoader__.load({
       workspaceFiles: (n) => `${n} 个文件`,
       workspaceNone: '尚未读取',
       workspaceSecurity: (n) => (n ? `安全扫描命中 ${n} 处` : '安全扫描无命中'),
+      document: '文档',
+      documentAuto: '自动挑选（相关性优先）',
+      documentNone: '未找到可读文档',
+      documentMissing: '当前工作区没有可读文档：请选一个文件，或改用「按类型起草」。',
+      documentChars: (n) => `${n} 字`,
+      documentHeadings: (n) => `${n} 个标题`,
+      documentRefresh: '刷新文档',
+      documentOutline: '框架',
+      documentPick: '选择文档',
       start: '开始增强',
       stop: '停止',
       retry: '再试一次',
@@ -56,15 +66,17 @@ window.__ModuleLoader__.load({
       metaMethod: '方法论',
       metaFiles: '读取文件',
       metaSecurity: '安全命中',
+      metaDocument: '文档',
       streamHint: '模型正在流式生成，可随时停止。',
       errorPrefix: '出了点问题：',
       readyHint: '增强后会给出可直接使用的完整提示词。',
     }
 
-    const READY_VARIANT = { code: 'code-read', creative: 'creative-rich' }
+    const READY_VARIANT = { code: 'code-read', creative: 'creative-rich', doc: 'doc-fill' }
     const DEFAULT_FOCUS = ['framework', 'security']
-    const VARIANT_CHOICES = ['code-read', 'code-only', 'creative-rich', 'creative-structure']
+    const VARIANT_CHOICES = ['code-read', 'code-only', 'creative-rich', 'creative-structure', 'doc-fill', 'doc-draft']
     const FOCUS_CHOICES = ['framework', 'security']
+    const MODE_CHOICES = ['code', 'creative', 'doc']
     const PREFS_KEY = 'dsh-prompt-enhance.prefs'
 
     /** Last-used panel choices, remembered per browser (optional, best effort). */
@@ -103,6 +115,11 @@ window.__ModuleLoader__.load({
       const saved = prefs && Array.isArray(prefs.focus) ? prefs.focus : []
       const picked = FOCUS_CHOICES.filter((id) => saved.includes(id))
       return picked.length ? picked : DEFAULT_FOCUS
+    }
+
+    function pickDocPath(prefs) {
+      const saved = prefs && typeof prefs.docPath === 'string' ? prefs.docPath : ''
+      return saved.slice(0, 400)
     }
 
     /* ---------------------------------------------------------------- */
@@ -387,14 +404,17 @@ window.__ModuleLoader__.load({
       const [open, setOpen] = useState(false)
       const [catalog, setCatalog] = useState(null)
       const [catalogError, setCatalogError] = useState('')
-      const [mode, setMode] = useState(() => (prefs && prefs.mode === 'creative' ? 'creative' : 'code'))
+      const [mode, setMode] = useState(() => (prefs && MODE_CHOICES.includes(prefs.mode) ? prefs.mode : 'code'))
       const [variants, setVariants] = useState(() => pickVariants(prefs))
       const [focus, setFocus] = useState(() => pickFocus(prefs))
+      const [docPath, setDocPath] = useState(() => pickDocPath(prefs))
       const [methodology, setMethodology] = useState(() =>
         prefs && typeof prefs.methodology === 'string' && prefs.methodology ? prefs.methodology : 'auto',
       )
       const [workspace, setWorkspace] = useState(null)
       const [workspaceBusy, setWorkspaceBusy] = useState(false)
+      const [documents, setDocuments] = useState(null)
+      const [documentsBusy, setDocumentsBusy] = useState(false)
       const [stage, setStage] = useState('idle')
       const [streamText, setStreamText] = useState('')
       const [result, setResult] = useState('')
@@ -463,8 +483,8 @@ window.__ModuleLoader__.load({
       }, [open])
 
       useEffect(() => {
-        writePrefs({ mode, variants, focus, methodology })
-      }, [mode, variants, focus, methodology])
+        writePrefs({ mode, variants, focus, methodology, docPath })
+      }, [mode, variants, focus, methodology, docPath])
 
       /* catalog -------------------------------------------------------- */
 
@@ -506,6 +526,34 @@ window.__ModuleLoader__.load({
       useEffect(() => {
         if (open && wantsWorkspace && !workspace && !workspaceBusy) loadWorkspace(false)
       }, [open, wantsWorkspace, workspace, workspaceBusy, loadWorkspace])
+
+      const wantsDocument = mode === 'doc' && variant === 'doc-fill'
+
+      const loadDocuments = useCallback(
+        async (refresh, overridePath) => {
+          setDocumentsBusy(true)
+          try {
+            const params = new URLSearchParams()
+            if (refresh) params.set('refresh', '1')
+            if (sessionCwd) params.set('cwd', sessionCwd)
+            const target = typeof overridePath === 'string' ? overridePath : docPath
+            if (target) params.set('path', target)
+            if (trimmedDraft) params.set('prompt', trimmedDraft.slice(0, 200))
+            const query = params.toString()
+            const payload = await readJson(`/documents${query ? `?${query}` : ''}`, { method: 'GET' })
+            setDocuments(payload)
+          } catch (failure) {
+            setNotice(failure && failure.message ? failure.message : '文档读取失败')
+          } finally {
+            setDocumentsBusy(false)
+          }
+        },
+        [docPath, sessionCwd, trimmedDraft],
+      )
+
+      useEffect(() => {
+        if (open && wantsDocument && !documents && !documentsBusy) loadDocuments(false)
+      }, [open, wantsDocument, documents, documentsBusy, loadDocuments])
 
       /* placement ------------------------------------------------------ */
 
@@ -604,6 +652,10 @@ window.__ModuleLoader__.load({
           setError(LABELS.focusHint)
           return
         }
+        if (wantsDocument && documents && (!documents.documents || !documents.documents.length) && !docPath) {
+          setError(LABELS.documentMissing)
+          return
+        }
         setError('')
         setNotice('')
         setStage('running')
@@ -623,6 +675,7 @@ window.__ModuleLoader__.load({
           variant,
           methodology,
           ...(mode === 'code' ? { focus } : {}),
+          ...(mode === 'doc' && docPath ? { docPath } : {}),
           ...(sessionCwd ? { cwd: sessionCwd } : {}),
           ...(sessionId ? { sessionId } : {}),
         }
@@ -681,7 +734,7 @@ window.__ModuleLoader__.load({
         } finally {
           if (abortRef.current === controller) abortRef.current = null
         }
-      }, [captureInsertion, focus, methodology, mode, sessionCwd, sessionId, stage, trimmedDraft, variant])
+      }, [captureInsertion, docPath, documents, focus, methodology, mode, sessionCwd, sessionId, stage, trimmedDraft, variant, wantsDocument])
 
       useEffect(() => () => {
         if (abortRef.current) abortRef.current.abort()
@@ -927,6 +980,74 @@ window.__ModuleLoader__.load({
             )
           : null
 
+        const selectedDocument = documents && documents.selected ? documents.selected : null
+        const documentOptions = documents && Array.isArray(documents.documents) ? documents.documents : []
+        const documentValue = docPath || (selectedDocument ? selectedDocument.path : '')
+
+        const documentNote = wantsDocument
+          ? h(
+              'div',
+              { className: 'dpe-note' },
+              h('b', null, LABELS.document),
+              ' ',
+              selectedDocument
+                ? selectedDocument.path
+                : documents
+                  ? LABELS.documentNone
+                  : catalog && catalog.workspace
+                    ? catalog.workspace.root
+                    : '—',
+              selectedDocument
+                ? h(
+                    'div',
+                    null,
+                    `${LABELS.documentChars(selectedDocument.chars)} · ${LABELS.documentHeadings(selectedDocument.headings)}`,
+                    selectedDocument.outline && selectedDocument.outline.length
+                      ? h(
+                          'div',
+                          { className: 'dpe-note-mono' },
+                          selectedDocument.outline
+                            .slice(0, 4)
+                            .map((item) => item.text)
+                            .join(' · '),
+                        )
+                      : null,
+                  )
+                : null,
+              documentOptions.length
+                ? h(
+                    'select',
+                    {
+                      className: 'dpe-select',
+                      style: { marginTop: '6px', width: '100%' },
+                      value: documentValue,
+                      'aria-label': LABELS.documentPick,
+                      onChange: (event) => {
+                        const next = event.target.value
+                        setDocPath(next)
+                        loadDocuments(false, next)
+                      },
+                    },
+                    h('option', { key: 'auto', value: '' }, LABELS.documentAuto),
+                    ...documentOptions.map((entry) =>
+                      h('option', { key: entry.path, value: entry.path }, `${entry.path}（${entry.chars} 字）`),
+                    ),
+                  )
+                : null,
+              h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'dpe-btn',
+                  style: { marginTop: '6px', height: '24px', padding: '0 8px' },
+                  disabled: documentsBusy,
+                  onClick: () => loadDocuments(true),
+                },
+                documentsBusy ? LABELS.running : LABELS.documentRefresh,
+              ),
+            )
+          : null
+
         const errorNote = error
           ? h('div', { className: 'dpe-note dpe-note-error' }, LABELS.errorPrefix, error)
           : catalogError
@@ -941,6 +1062,9 @@ window.__ModuleLoader__.load({
               meta.methodologyLabel ? h('span', null, `${LABELS.metaMethod} ${meta.methodologyLabel}`) : null,
               wantsWorkspace ? h('span', null, `${LABELS.metaFiles} ${meta.workspaceScanned || 0}`) : null,
               wantsWorkspace ? h('span', null, `${LABELS.metaSecurity} ${meta.securityFindings || 0}`) : null,
+              wantsDocument ? h('span', null, `${LABELS.metaDocument} ${meta.documentPath || '—'}`) : null,
+              wantsDocument && meta.documentChars ? h('span', null, LABELS.documentChars(meta.documentChars)) : null,
+              wantsDocument && meta.documentHeadings ? h('span', null, LABELS.documentHeadings(meta.documentHeadings)) : null,
             )
           : null
 
@@ -1027,6 +1151,7 @@ window.__ModuleLoader__.load({
           focusRow,
           methodRow,
           workspaceNote,
+          documentNote,
           stage === 'idle' && error ? errorNote : null,
           body,
         )
@@ -1070,7 +1195,7 @@ window.__ModuleLoader__.load({
     return {
       inject: ['slots'],
       apply(ctx) {
-        beat('client-apply', 'v0.1.1')
+        beat('client-apply', 'v1.1.0')
         ctx.slots.inject('conversation.input.right', () =>
           ctx.slots.register(
             { name: 'conversation.input.right', id: 'prompt-enhance-trigger', order: 20 },

@@ -18,6 +18,7 @@ HTTP API and the client renders the composer control-row UI.
 | --- | --- | --- |
 | `code` | 代码 | `code-read`, `code-only` |
 | `creative` | 创作 | `creative-rich`, `creative-structure` |
+| `doc` | 文档 | `doc-fill`, `doc-draft` |
 
 `variant` — the concrete enhancement style:
 
@@ -27,11 +28,19 @@ HTTP API and the client renders the composer control-row UI.
 | `code-only` | 仅按提示词优化 | no workspace read; infer the dev type from the prompt alone |
 | `creative-rich` | 补充丰富型 | polish + expand the wording (imagery, detail, rhythm) |
 | `creative-structure` | 结构严谨型 | impose a rigorous structure (script/beat sheet, or product copy skeleton) |
+| `doc-fill` | 读文档后补写 | read one document's outline + formatting, then rewrite the prompt so the model fills the gaps in that structure |
+| `doc-draft` | 按类型起草 | no document to read; ask for a document-type skeleton and writing rules |
 
 `focus` — only for `code` variants, at least one required:
 
 - `framework` — 完善开发框架 (architecture, module layout, contracts, testing, delivery)
 - `security` — 审查安全性 (threat model, input validation, secrets, injection, authz)
+
+`docPath` — optional for `doc-fill`: workspace-relative path of the document to read. It must
+stay inside the resolved workspace root (`doc-outside-root` otherwise) and must be a text
+document extension (`.md`, `.mdx`, `.markdown`, `.txt`, `.rst`, `.adoc`, `.org`, `.tex`).
+When omitted, the host ranks the workspace's documents by prompt relevance, sub-directory,
+`docs/`, recency and size and picks the best one.
 
 `methodology` — `auto` (default) or one of `superpower`, `langgpt`, `aishort`,
 `prompt-optimizer`. `auto` lets the host pick and explain the choice. The four fragments
@@ -40,6 +49,9 @@ are distilled from four public projects (see `docs/research/prompt-sources.md`):
 GitHub API; its README badge says MIT — conflict recorded in the research notes),
 `aishort` = rockbenben/ChatGPT-Shortcut (MIT code, community cards),
 `prompt-optimizer` = linshenkx/prompt-optimizer (custom licence, not MIT).
+Each methodology carries three fragments: `codeSystem` (engineering), `creativeSystem`
+(writing) and `docSystem` (document work: keep the existing skeleton, mark gaps instead of
+inventing them).
 
 ## HTTP API (host)
 
@@ -53,19 +65,22 @@ so every write must be guarded by loopback + same-origin + JSON content-type che
 ```json
 {
   "ok": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "provider": "workbuddy2api-hub",
   "model": "deepseek-v4.1-flash",
   "modelSource": "session-default",
   "workspace": { "root": "C:\\...\\default-workspace", "source": "config|registry|session|cwd" },
-  "limits": { "maxPromptChars": 12000, "maxWorkspaceFiles": 40, "maxWorkspaceBytes": 60000 },
+  "limits": { "maxPromptChars": 12000, "maxWorkspaceFiles": 40, "maxWorkspaceBytes": 60000, "maxDocumentChars": 16000 },
   "modes": [
     { "id": "code", "label": "代码", "variants": [
         { "id": "code-read", "label": "读取工作区后优化", "hint": "先扫描工作区再改写" },
         { "id": "code-only", "label": "仅按提示词优化", "hint": "不读代码，按开发类型补全" } ] },
     { "id": "creative", "label": "创作", "variants": [
         { "id": "creative-rich", "label": "补充丰富型", "hint": "润色 + 扩写" },
-        { "id": "creative-structure", "label": "结构严谨型", "hint": "结构化/剧本化" } ] }
+        { "id": "creative-structure", "label": "结构严谨型", "hint": "结构化/剧本化" } ] },
+    { "id": "doc", "label": "文档", "variants": [
+        { "id": "doc-fill", "label": "读文档后补写", "hint": "先读文档框架与格式再补写" },
+        { "id": "doc-draft", "label": "按类型起草", "hint": "没有现成文档时按类型搭框架" } ] }
   ],
   "focuses": [
     { "id": "framework", "label": "完善开发框架", "hint": "模块划分、接口契约、测试与交付" },
@@ -116,21 +131,60 @@ configured/registry root when it is an existing directory (`source: "session"`).
 }
 ```
 
+### `GET /prompt-enhance/api/documents?refresh=1&cwd=…&prompt=…&path=…`
+
+Lists the readable documents of the workspace and outlines the one that would be read.
+`cwd` has the same meaning as on `/workspace`. `prompt` (≤240 chars) steers the ranking;
+`path` pins one document (workspace-relative or absolute inside the root). `refresh=1`
+bypasses the 10 s cache. Only text formats are listed — `.docx`/`.pdf` are not parsed.
+
+```json
+{
+  "ok": true,
+  "root": "C:\\...\\default-workspace",
+  "source": "registry",
+  "cwd": "C:\\...\\default-workspace",
+  "requested": "",
+  "total": 61,
+  "documents": [
+    { "path": "prompt-enhance/README.md", "chars": 11340, "headings": 27, "score": 3.2, "modifiedAt": 1761 }
+  ],
+  "selected": {
+    "path": "prompt-enhance/README.md",
+    "chars": 11340,
+    "lines": 305,
+    "headings": 27,
+    "truncated": false,
+    "outline": [{ "level": 1, "text": "dsh-prompt-enhance", "line": 1 }],
+    "format": { "headingStyle": "Markdown ATX（#）", "maxDepth": 3, "tables": 7, "codeBlocks": 8, "orderedLists": 10, "unorderedLists": 59, "links": 46, "bold": 37, "frontMatter": false, "numbering": "1. / 1.1", "avgParagraph": 136 }
+  },
+  "durationMs": 14
+}
+```
+
+`selected` is `null` when nothing readable was found; the client then shows
+「未找到可读文档」 and blocks `doc-fill` (the user can still switch to `doc-draft`).
+
 ### `POST /prompt-enhance/api/enhance` — `text/event-stream`
 
 Request body:
 
 ```json
 {
-  "prompt": "给结算页加一个优惠券输入框",
-  "mode": "code",
-  "variant": "code-read",
-  "focus": ["framework", "security"],
+  "prompt": "在这份文档里补写「安装」与「已知限制」两节的缺失内容",
+  "mode": "doc",
+  "variant": "doc-fill",
+  "focus": [],
   "methodology": "auto",
+  "docPath": "prompt-enhance/README.md",
   "cwd": "C:\\optional\\absolute\\path",
   "sessionId": "optional-session-id"
 }
 ```
+
+`mode` must be one of the catalogue ids and `variant` must start with `${mode}-`;
+`focus` is required for `code` variants and ignored otherwise; `docPath` only matters for
+`doc-fill`.
 
 Validation errors (400/413/415) are plain JSON. A successful call switches to SSE with
 `Cache-Control: no-cache, no-transform`, `Connection: keep-alive`, `X-Accel-Buffering: no`.
@@ -139,11 +193,18 @@ Events (each `data:` line is one JSON object; a `: ping` comment is sent every 1
 
 | event | data |
 | --- | --- |
-| `meta` | `{ provider, model, modelSource, promptChars, mode, variant, focus, methodology, methodologyLabel, methodologyReason, workspaceRoot, workspaceSource, workspaceFiles, workspaceScanned, securityFindings, startedAt }` |
+| `meta` | `{ provider, model, modelSource, promptChars, mode, variant, focus, methodology, methodologyLabel, methodologyReason, workspaceRoot, workspaceSource, workspaceFiles, workspaceScanned, securityFindings, documentPath, documentChars, documentHeadings, startedAt }` |
 | `status` | `{ stage: "reasoning", chars }` (throttled to one per ~1.2 s) or `{ stage: "text", chars: 0 }` on the first visible token |
 | `delta` | `{ text }` |
 | `done` | `{ text, usage, finish, durationMs, truncated }` |
 | `error` | `{ code, message }` — `upstream-failed` or `empty-result` |
+
+`workspace*` is only populated for `code-read`, `document*` only for `doc-fill`.
+
+Validation error codes: `empty-prompt` (400), `prompt-too-long` (413), `bad-mode` (400),
+`bad-variant` (400), `mode-variant-mismatch` (400), `empty-focus` (400),
+`bad-methodology` (400), `no-model` (503), and for `doc-fill`: `no-document` (400),
+`doc-outside-root` (400), `doc-unsupported` (400), `doc-unreadable` (400).
 
 The host aborts the model call when the HTTP request closes.
 
@@ -178,12 +239,17 @@ UI requirements:
    even with an empty draft — the panel explains what is missing — and is only disabled
    while an enhancement is running and the panel is closed.
 2. Clicking opens a popover panel anchored above the button:
-   - 代码 / 创作 tab switch.
-   - Variant cards (radio behaviour) per the vocabulary above.
+   - 代码 / 创作 / 文档 tab switch.
+   - Variant cards (radio behaviour) per the vocabulary above; the last choice per family is
+     remembered in `localStorage` under `dsh-prompt-enhance.prefs` (panel choices only, never
+     the draft text).
    - Code mode: focus checkboxes (`framework`, `security`), at least one required.
    - Methodology select (`auto` first) with the hint text.
    - Workspace preview line for `code-read`: file count + "预览/刷新" that calls the
      workspace endpoint and shows the first few paths.
+   - Document line for `doc-fill`: selected path + 「N 字 · N 个标题」 + the first outline
+     entries, a candidate `<select>` (`自动挑选（最近修改）` first) that re-reads
+     `/documents`, and a `刷新文档` button.
    - Primary `开始增强` button; while running a `停止` button plus streaming text.
    - Result step: editable textarea with the enhanced prompt and
      `替换输入框` (`setDraft`), `插入到光标` (`insertText` with the span captured at

@@ -199,7 +199,7 @@ class Notes:
         self.placed = []
         self.probe = ImageDraw.Draw(Image.new("RGBA", (4, 4)))
 
-    def add(self, y_element, title, detail):
+    def add(self, y_element, title, detail=""):
         self.items.append((y_element, title, detail))
 
     def place(self, min_gap):
@@ -253,13 +253,26 @@ def panel_head(draw, x, y, w):
     text(draw, bx + s(11), y + s(9), "×", font("ui", 13), TEXT3, anchor="mm")
 
 
-def panel_tabs(draw, x, y, w):
+TAB_LABELS = ("代码", "创作", "文档")
+
+
+def panel_tabs(draw, x, y, w, labels=TAB_LABELS, active=0):
     rounded(draw, [x, y, x + w, y + s(32)], s(10), fill=(40, 42, 47))
     pad = s(3)
-    half = (w - pad * 2) / 2
-    rounded(draw, [x + pad, y + pad, x + pad + half, y + s(32) - pad], s(8), fill=(60, 64, 72))
-    text(draw, x + pad + half / 2, y + s(16), "代码", font("bold", 12), TEXT, anchor="mm")
-    text(draw, x + pad + half * 1.5, y + s(16), "创作", font("ui", 12), TEXT2, anchor="mm")
+    seg = (w - pad * 2) / len(labels)
+    for index, label in enumerate(labels):
+        left = x + pad + seg * index
+        if index == active:
+            rounded(draw, [left, y + pad, left + seg, y + s(32) - pad], s(8), fill=(60, 64, 72))
+        text(
+            draw,
+            left + seg / 2,
+            y + s(16),
+            label,
+            font("bold" if index == active else "ui", 12),
+            TEXT if index == active else TEXT2,
+            anchor="mm",
+        )
 
 
 def panel_card(draw, x, y, w, title, hint, active):
@@ -430,8 +443,8 @@ def render_panel(path):
     panel[3] = bottom
 
     notes = Notes(edge_x, s(1172), s(300))
-    notes.add(tabs_y + s(16), "先选大类", "代码 / 创作；切换会记住各自上次用的方式")
-    notes.add(cards_y + s(83), "四种增强方式", "代码两种、创作两种，卡片上写着各自的增益")
+    notes.add(tabs_y + s(16), "先选大类", "代码 / 创作 / 文档，切换会记住各自上次用的方式")
+    notes.add(cards_y + s(83), "六种增强方式", "每类两种，卡片上写着各自的增益")
     notes.add(focus_y + s(13), "代码类再加方向", "完善开发框架 / 审查安全性，可多选、至少一项")
     notes.add(method_y + s(13), "方法论可自适应", "默认 auto 按场景打分，也可手动锁定某一家")
     notes.add(note_y + note_h / 2, "工作区证据可见", "读取前就告诉你要扫哪、多少文件、几处安全命中")
@@ -575,7 +588,9 @@ def render_result(path):
     inner_x = x0 + pad
 
     panel_head(draw, inner_x, y0 + s(18), inner_w)
-    panel_tabs(draw, inner_x, tabs_y, inner_w)
+    # `ui-result.png` is out of scope for the doc-family refresh: keep its tab row
+    # exactly as shipped in the existing picture (two families, code active).
+    panel_tabs(draw, inner_x, tabs_y, inner_w, labels=("代码", "创作"))
     panel_card(
         draw,
         inner_x,
@@ -612,11 +627,117 @@ def render_result(path):
     return img.size
 
 
+# --------------------------------------------------------------------------
+# illustration 4: the document family panel (doc-fill selected)
+# --------------------------------------------------------------------------
+
+
+def panel_doc_block(draw, x, y, w, h):
+    """The document row: selected file, size/headings, outline, picker, refresh."""
+    rounded(draw, [x, y, x + w, y + h], s(9), fill=(35, 38, 43), outline=BORDER_SOFT, width=s(1))
+    nx, ny = x + s(12), y + s(18)
+    text(draw, nx, ny, "文档", font("bold", 11), TEXT3)
+    label_w = draw.textlength("文档", font=font("bold", 11))
+    mixed(draw, nx + label_w + s(8), ny, "prompt-enhance/README.md", 11, TEXT2)
+    text(draw, nx, ny + s(34), "11340 字 · 27 个标题", font("ui", 11), TEXT3)
+    mixed(draw, nx, ny + s(78), "目录 · 功能 · 界面一览 · 六种增强方式", 10.5, (152, 158, 168))
+    panel_select(draw, nx, ny + s(118), w - s(24), "自动挑选（相关性优先）")
+    button(draw, nx, ny + s(162), "刷新文档", height=24)
+
+
+def render_panel_doc(path):
+    css_w = 1500
+    pad = s(20)
+    panel = [s(52), s(36), s(1096), 0]
+    inner_w = (panel[2] - pad) - (panel[0] + pad)
+    edge_x = panel[2]
+
+    y = s(56)
+    y += s(34) + s(14)  # head
+    tabs_y = y
+    y += s(32) + s(12)
+    cards_y = y
+    y += s(52) + s(6) + s(52)
+    y += s(14)
+    doc_y = y
+    doc_h = s(216)
+    y += doc_h + s(12)
+    method_y = y
+    y += s(32) + s(12)
+    actions_y = y
+    bottom = actions_y + s(28) + s(16)
+    panel[3] = bottom
+
+    notes = Notes(edge_x, s(1172), s(300))
+    notes.add(doc_y + s(38), "选中文档与其字数、标题数")
+    notes.add(doc_y + s(100), "文档框架大纲的前几条，用于对齐结构")
+    notes.add(doc_y + s(149), "候选文档下拉：可手动指定要补写的文件")
+    notes.add(doc_y + s(195), "刷新文档会重新扫描工作区")
+    notes.add(doc_y + s(208), "自动挑选按提示词相关性与近期修改排序")
+    notes.place(s(46))
+
+    img = Image.new("RGBA", (s(css_w), max(bottom, notes.bottom()) + s(34)), BG + (255,))
+    draw = surface(img, panel, s(14))
+    x0, y0 = panel[0], panel[1]
+    inner_x = x0 + pad
+
+    panel_head(draw, inner_x, y0 + s(20), inner_w)
+    panel_tabs(draw, inner_x, tabs_y, inner_w, active=2)
+    panel_card(
+        draw,
+        inner_x,
+        cards_y,
+        inner_w,
+        "读文档后补写",
+        "先读当前文档的框架与格式，再按既有结构补写缺失内容",
+        True,
+    )
+    panel_card(
+        draw,
+        inner_x,
+        cards_y + s(58),
+        inner_w,
+        "按类型起草",
+        "没有现成文档时，按文档类型搭好框架与写作要求",
+        False,
+    )
+    panel_doc_block(draw, inner_x, doc_y, inner_w, doc_h)
+
+    text(draw, inner_x, method_y + s(6), "方法论", font("ui", 11), TEXT3)
+    panel_select(draw, inner_x + s(56), method_y, s(190), "自适应（推荐）")
+    text(
+        draw,
+        inner_x + s(258),
+        method_y + s(13),
+        "→ LangGPT 结构化提示词",
+        font("ui", 11),
+        (150, 176, 230),
+        anchor="lm",
+    )
+
+    x_cursor = button(draw, inner_x, actions_y, "开始增强", primary=True)
+    text(
+        draw,
+        x_cursor + s(2),
+        actions_y + s(14),
+        "增强后会给出可直接使用的完整提示词。",
+        font("ui", 11),
+        TEXT3,
+        anchor="lm",
+    )
+
+    notes.draw(draw)
+
+    img.convert("RGB").save(path, optimize=True)
+    return img.size
+
+
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     for name, render in (
         ("ui-composer.png", render_composer),
         ("ui-panel.png", render_panel),
+        ("ui-panel-doc.png", render_panel_doc),
         ("ui-result.png", render_result),
     ):
         target = os.path.join(here, name)
