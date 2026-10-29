@@ -20,60 +20,165 @@ window.__ModuleLoader__.load({
     const API_BASE = '/prompt-enhance/api'
     const PANEL_WIDTH = 384
 
-    const LABELS = {
-      trigger: '提示词增强',
-      triggerHint: '把当前输入框里的草稿增强为可执行的提示词',
-      triggerDisabled: '请先在输入框写下提示词',
-      title: '提示词增强',
-      subtitle: '先选类型，再增强；结果会回填到输入框',
-      close: '关闭',
-      tabCode: '代码',
-      tabCreative: '创作',
-      tabDoc: '文档',
-      focusTitle: '优化方向',
-      focusHint: '至少选择一项',
-      depthTitle: '档位',
-      depthHint: '简洁 / 默认 / 严谨',
-      methodology: '方法论',
-      methodologyAuto: '自适应',
-      workspace: '工作区',
-      workspaceRefresh: '刷新',
-      workspaceFiles: (n) => `${n} 个文件`,
-      workspaceNone: '尚未读取',
-      workspaceSecurity: (n) => (n ? `安全扫描命中 ${n} 处` : '安全扫描无命中'),
-      document: '文档',
-      documentAuto: '自动挑选（相关性优先）',
-      documentNone: '未找到可读文档',
-      documentMissing: '当前工作区没有可读文档：请选一个文件，或改用「按类型起草」。',
-      documentChars: (n, truncated) => (truncated ? `${n} 字（已截断）` : `${n} 字`),
-      documentHeadings: (n) => `${n} 个标题`,
-      documentRefresh: '刷新文档',
-      documentOutline: '框架',
-      documentPick: '选择文档',
-      start: '开始增强',
-      stop: '停止',
-      retry: '再试一次',
-      running: '增强中…',
-      thinking: '模型正在思考',
-      resultTitle: '增强结果',
-      apply: '替换输入框',
-      insert: '插入到光标',
-      copy: '复制',
-      copied: '已复制',
-      back: '返回修改',
-      collapse: '收起',
-      emptyDraft: '输入框是空的：先写一句你的需求，再点增强。',
-      noModel: '当前没有可用模型，请先在设置里选择默认模型。',
-      metaModel: '模型',
-      metaMethod: '方法论',
-      metaDepth: '档位',
-      metaFiles: '读取文件',
-      metaSecurity: '安全命中',
-      metaDocument: '文档',
-      streamHint: '模型正在流式生成，可随时停止。',
-      errorPrefix: '出了点问题：',
-      readyHint: '增强后会给出可直接使用的完整提示词。',
+    /**
+     * Interface copy. `zh` is the source language; `en` mirrors it key for key.
+     * Every string the user can see must exist in both maps (the tests check it).
+     */
+    const COPY = {
+      zh: {
+        trigger: '提示词增强',
+        triggerHint: '把当前输入框里的草稿增强为可执行的提示词',
+        triggerDisabled: '请先在输入框写下提示词',
+        title: '提示词增强',
+        subtitle: '先选类型，再增强；结果会回填到输入框',
+        close: '关闭',
+        language: '界面语言',
+        languageHint: '只切换本插件的文案',
+        tabCode: '代码',
+        tabCreative: '创作',
+        tabDoc: '文档',
+        focusTitle: '优化方向',
+        focusHint: '至少选择一项',
+        depthTitle: '档位',
+        depthHint: '简洁 / 默认 / 严谨',
+        methodology: '方法论',
+        methodologyAuto: '自适应',
+        workspace: '工作区',
+        workspaceRefresh: '刷新',
+        workspaceFiles: (n) => `${n} 个文件`,
+        workspaceNone: '尚未读取',
+        workspaceSecurity: (n) => (n ? `安全扫描命中 ${n} 处` : '安全扫描无命中'),
+        document: '文档',
+        documentAuto: '自动挑选（相关性优先）',
+        documentNone: '未找到可读文档',
+        documentMissing: '当前工作区没有可读文档：请选一个文件，或改用「按类型起草」。',
+        documentChars: (n, truncated) => (truncated ? `${n} 字（已截断）` : `${n} 字`),
+        documentHeadings: (n) => `${n} 个标题`,
+        documentRefresh: '刷新文档',
+        documentOutline: '框架',
+        documentPick: '选择文档',
+        start: '开始增强',
+        stop: '停止',
+        retry: '再试一次',
+        running: '增强中…',
+        thinking: '模型正在思考',
+        resultTitle: '增强结果',
+        apply: '替换输入框',
+        insert: '插入到光标',
+        copy: '复制',
+        copied: '已复制',
+        back: '返回修改',
+        collapse: '收起',
+        emptyDraft: '输入框是空的：先写一句你的需求，再点增强。',
+        noModel: '当前没有可用模型，请先在设置里选择默认模型。',
+        metaModel: '模型',
+        metaMethod: '方法论',
+        metaDepth: '档位',
+        metaFiles: '读取文件',
+        metaSecurity: '安全命中',
+        metaDocument: '文档',
+        streamHint: '模型正在流式生成，可随时停止。',
+        errorPrefix: '出了点问题：',
+        readyHint: '增强后会给出可直接使用的完整提示词。',
+        requestFailed: (status) => `请求失败（HTTP ${status}）`,
+        streamUnsupported: '当前浏览器不支持流式读取',
+        catalogFailed: '无法连接增强服务',
+        workspaceFailed: '工作区读取失败',
+        documentFailed: '文档读取失败',
+        emptyResult: '模型返回了空结果，请重试',
+        enhanceFailed: '增强失败',
+        noInput: '无法访问输入框',
+        insertUnsupported: '当前版本不支持回填输入框',
+        insertFailed: '回填失败',
+        copyFailed: '复制失败，请手动选择文本',
+        tabsLabel: '增强类型',
+        cardsLabel: '增强方式',
+        docOption: (path, chars) => `${path}（${chars} 字）`,
+        budgetSuffix: (n) => ` · ≤${n} 字`,
+        reasoningSuffix: (n) => `（${n} 字）`,
+      },
+      en: {
+        trigger: 'Enhance prompt',
+        triggerHint: 'Turn the draft in the composer into a prompt an agent can run',
+        triggerDisabled: 'Write a prompt in the composer first',
+        title: 'Enhance prompt',
+        subtitle: 'Pick a type, then enhance. The result goes back into the composer.',
+        close: 'Close',
+        language: 'Interface language',
+        languageHint: 'Changes this plugin only',
+        tabCode: 'Code',
+        tabCreative: 'Creative',
+        tabDoc: 'Document',
+        focusTitle: 'Focus',
+        focusHint: 'Pick at least one',
+        depthTitle: 'Length',
+        depthHint: 'Concise / Default / Thorough',
+        methodology: 'Technique',
+        methodologyAuto: 'Auto',
+        workspace: 'Workspace',
+        workspaceRefresh: 'Refresh',
+        workspaceFiles: (n) => `${n} file${n === 1 ? '' : 's'}`,
+        workspaceNone: 'Not read yet',
+        workspaceSecurity: (n) => (n ? `${n} security hit${n === 1 ? '' : 's'}` : 'No security hits'),
+        document: 'Document',
+        documentAuto: 'Pick automatically (most relevant)',
+        documentNone: 'No readable document found',
+        documentMissing: 'No readable document in this workspace: pick one, or switch to "Draft by type".',
+        documentChars: (n, truncated) => (truncated ? `${n} chars (truncated)` : `${n} chars`),
+        documentHeadings: (n) => `${n} heading${n === 1 ? '' : 's'}`,
+        documentRefresh: 'Refresh document',
+        documentOutline: 'Outline',
+        documentPick: 'Pick a document',
+        start: 'Enhance',
+        stop: 'Stop',
+        retry: 'Try again',
+        running: 'Enhancing…',
+        thinking: 'The model is thinking',
+        resultTitle: 'Result',
+        apply: 'Replace the draft',
+        insert: 'Insert at the cursor',
+        copy: 'Copy',
+        copied: 'Copied',
+        back: 'Back to the options',
+        collapse: 'Collapse',
+        emptyDraft: 'The composer is empty: write what you need first.',
+        noModel: 'No model is available. Pick a default model in the settings first.',
+        metaModel: 'Model',
+        metaMethod: 'Technique',
+        metaDepth: 'Length',
+        metaFiles: 'Files read',
+        metaSecurity: 'Security hits',
+        metaDocument: 'Document',
+        streamHint: 'The model is streaming. You can stop at any time.',
+        errorPrefix: 'Something went wrong: ',
+        readyHint: 'The result is a prompt you can send as it is.',
+        requestFailed: (status) => `Request failed (HTTP ${status})`,
+        streamUnsupported: 'This browser cannot stream the response',
+        catalogFailed: 'Cannot reach the enhancement service',
+        workspaceFailed: 'Could not read the workspace',
+        documentFailed: 'Could not read the document',
+        emptyResult: 'The model returned nothing. Try again.',
+        enhanceFailed: 'Enhancement failed',
+        noInput: 'Cannot reach the composer',
+        insertUnsupported: 'This DSH version cannot write back to the composer',
+        insertFailed: 'Could not write to the composer',
+        copyFailed: 'Copy failed. Select the text by hand.',
+        tabsLabel: 'Enhancement type',
+        cardsLabel: 'Enhancement style',
+        docOption: (path, chars) => `${path} (${chars} chars)`,
+        budgetSuffix: (n) => ` · ≤${n} chars`,
+        reasoningSuffix: (n) => ` (${n} chars)`,
+      },
     }
+
+    const LANGUAGES = ['zh', 'en']
+    const LANGUAGE_LABELS = { zh: '中文', en: 'English' }
+    /** First-run language: follow DeepSeek Harness when the locale service is there. */
+    let defaultLanguage = 'zh'
+    /** The language of the last render; the transport helpers use it for error copy. */
+    let currentLanguage = defaultLanguage
+    const copy = () => COPY[currentLanguage] || COPY.zh
+
 
     const READY_VARIANT = { code: 'code-read', creative: 'creative-rich', doc: 'doc-fill' }
     const DEFAULT_FOCUS = ['framework', 'security']
@@ -83,6 +188,112 @@ window.__ModuleLoader__.load({
     const DEPTH_CHOICES = ['concise', 'default', 'thorough']
     const DEFAULT_DEPTH = 'default'
     const PREFS_KEY = 'dsh-prompt-enhance.prefs'
+
+    /**
+     * Vocabulary the host sends as Chinese labels (`/state` → modes/variants/focuses/depths/
+     * methodologies). The panel shows its own copy of these words so switching the language
+     * does not leave half the panel in Chinese; unknown ids fall back to the host label.
+     */
+    const VOCAB = {
+      mode: {
+        code: { label: { zh: '代码', en: 'Code' } },
+        creative: { label: { zh: '创作', en: 'Creative' } },
+        doc: { label: { zh: '文档', en: 'Document' } },
+      },
+      variant: {
+        'code-read': {
+          label: { zh: '读取工作区后优化', en: 'Read the workspace first' },
+          hint: {
+            zh: '先扫描当前工作区的目录与关键文件，再按真实代码改写提示词',
+            en: 'Scan the workspace and rewrite the prompt against the real code first.',
+          },
+        },
+        'code-only': {
+          label: { zh: '仅按提示词优化', en: 'Prompt only' },
+          hint: {
+            zh: '不读取代码，按提示词判断开发类型并补全开发框架',
+            en: 'No code read: infer the development type and fill in the framework.',
+          },
+        },
+        'creative-rich': {
+          label: { zh: '补充丰富型', en: 'Enrich' },
+          hint: {
+            zh: '润色语言并扩写细节，让画面与人物更具体',
+            en: 'Polish the wording and expand the detail.',
+          },
+        },
+        'creative-structure': {
+          label: { zh: '结构严谨型', en: 'Structure' },
+          hint: {
+            zh: '完善脚本、分镜或大纲的结构，让描述更精细严谨',
+            en: 'Tighten the structure of a script, storyboard or outline.',
+          },
+        },
+        'doc-fill': {
+          label: { zh: '读文档后补写', en: 'Fill a document' },
+          hint: {
+            zh: '先读当前文档的框架与格式，再按既有结构补写缺失内容',
+            en: "Read the document's skeleton and format, then fill in what is missing.",
+          },
+        },
+        'doc-draft': {
+          label: { zh: '按类型起草', en: 'Draft by type' },
+          hint: {
+            zh: '没有现成文档时，按文档类型给出完整框架与内容',
+            en: 'No document yet: draft a full skeleton for this document type.',
+          },
+        },
+      },
+      focus: {
+        framework: {
+          label: { zh: '完善开发框架', en: 'Development framework' },
+          hint: { zh: '模块划分、接口契约、测试与交付', en: 'Modules, interfaces, tests and delivery.' },
+        },
+        security: {
+          label: { zh: '审查安全性', en: 'Security review' },
+          hint: { zh: '威胁模型、输入校验、注入面与密钥', en: 'Threat model, input checks, injection surface and secrets.' },
+        },
+      },
+      depth: {
+        concise: {
+          label: { zh: '简洁', en: 'Concise' },
+          hint: {
+            zh: '只留目标、硬约束与验收，约为严谨档的三分之一',
+            en: 'Goal, hard constraints and acceptance only — about a third of thorough.',
+          },
+        },
+        default: {
+          label: { zh: '默认', en: 'Default' },
+          hint: {
+            zh: '分节但克制，约为严谨档的三分之二',
+            en: 'Sectioned but restrained — about two thirds of thorough.',
+          },
+        },
+        thorough: {
+          label: { zh: '严谨', en: 'Thorough' },
+          hint: {
+            zh: '完整结构、分步计划与验收清单，Superpowers 平时的篇幅',
+            en: "Full structure, step plan and acceptance list — Superpowers' usual length.",
+          },
+        },
+      },
+      methodology: {
+        auto: { label: { zh: '自适应（推荐）', en: 'Adaptive (recommended)' } },
+        superpower: { label: { zh: 'Superpowers', en: 'Superpowers' } },
+        langgpt: { label: { zh: 'LangGPT 结构化提示词', en: 'LangGPT structured prompt' } },
+        aishort: { label: { zh: 'AiShort 提示词库', en: 'AiShort prompt library' } },
+        'prompt-optimizer': { label: { zh: 'Prompt Optimizer', en: 'Prompt Optimizer' } },
+      },
+    }
+
+    /** One word from the vocabulary, in the language being shown right now. */
+    function word(language, kind, id, field = 'label') {
+      const entry = VOCAB[kind] && VOCAB[kind][id]
+      const value = entry && entry[field]
+      if (!value) return ''
+      return value[language] || value.zh || ''
+    }
+
 
     /** Last-used panel choices, remembered per browser (optional, best effort). */
     function readPrefs() {
@@ -132,6 +343,11 @@ window.__ModuleLoader__.load({
       return DEPTH_CHOICES.includes(saved) ? saved : DEFAULT_DEPTH
     }
 
+    function pickLanguage(prefs) {
+      const saved = prefs && typeof prefs.lang === 'string' ? prefs.lang : ''
+      return LANGUAGES.includes(saved) ? saved : defaultLanguage
+    }
+
     /* ---------------------------------------------------------------- */
     /* transport                                                         */
     /* ---------------------------------------------------------------- */
@@ -171,7 +387,7 @@ window.__ModuleLoader__.load({
       }
       if (!response.ok || !payload || payload.ok === false) {
         const message = payload && payload.error && payload.error.message
-        throw new Error(message || `请求失败（HTTP ${response.status}）`)
+        throw new Error(message || copy().requestFailed(response.status))
       }
       return payload
     }
@@ -187,7 +403,7 @@ window.__ModuleLoader__.load({
       })
       const contentType = response.headers.get('content-type') || ''
       if (!response.ok || !contentType.includes('text/event-stream')) {
-        let message = `请求失败（HTTP ${response.status}）`
+        let message = copy().requestFailed(response.status)
         try {
           const payload = await response.json()
           if (payload && payload.error && payload.error.message) message = payload.error.message
@@ -197,7 +413,7 @@ window.__ModuleLoader__.load({
         throw new Error(message)
       }
       if (!response.body || typeof response.body.getReader !== 'function') {
-        throw new Error('当前浏览器不支持流式读取')
+        throw new Error(copy().streamUnsupported)
       }
 
       const reader = response.body.getReader()
@@ -283,6 +499,8 @@ window.__ModuleLoader__.load({
 }
 .dpe-head { display: flex; align-items: flex-start; gap: 8px; }
 .dpe-head-main { flex: 1; min-width: 0; }
+.dpe-langs { display: inline-flex; align-items: center; gap: 4px; }
+.dpe-lang { height: 22px; padding: 0 7px; font-size: 11px; }
 .dpe-title { font-size: 13px; font-weight: 600; color: var(--dsw-alias-label-primary, inherit); }
 .dpe-sub { margin-top: 2px; font-size: 11px; color: var(--dsw-alias-label-tertiary, inherit); }
 .dpe-x {
@@ -411,6 +629,10 @@ window.__ModuleLoader__.load({
         : ''
 
       const [prefs] = useState(readPrefs)
+      const [lang, setLang] = useState(() => pickLanguage(prefs))
+      /** Every string this render shows; the language chips swap the whole map. */
+      const LABELS = COPY[lang] || COPY.zh
+      const w = (kind, id, field = 'label') => word(lang, kind, id, field)
       const [open, setOpen] = useState(false)
       const [catalog, setCatalog] = useState(null)
       const [catalogError, setCatalogError] = useState('')
@@ -494,8 +716,12 @@ window.__ModuleLoader__.load({
       }, [open])
 
       useEffect(() => {
-        writePrefs({ mode, variants, focus, depth, methodology, docPath })
-      }, [mode, variants, focus, depth, methodology, docPath])
+        writePrefs({ mode, variants, focus, depth, methodology, docPath, lang })
+      }, [mode, variants, focus, depth, methodology, docPath, lang])
+
+      useEffect(() => {
+        currentLanguage = lang
+      }, [lang])
 
       /* catalog -------------------------------------------------------- */
 
@@ -505,7 +731,7 @@ window.__ModuleLoader__.load({
           const payload = await readJson('/state', { method: 'GET' })
           setCatalog(payload)
         } catch (failure) {
-          setCatalogError(failure && failure.message ? failure.message : '无法连接增强服务')
+          setCatalogError(failure && failure.message ? failure.message : LABELS.catalogFailed)
         }
       }, [])
 
@@ -526,7 +752,7 @@ window.__ModuleLoader__.load({
             const payload = await readJson(`/workspace${query ? `?${query}` : ''}`, { method: 'GET' })
             setWorkspace(payload)
           } catch (failure) {
-            setNotice(failure && failure.message ? failure.message : '工作区读取失败')
+            setNotice(failure && failure.message ? failure.message : LABELS.workspaceFailed)
           } finally {
             setWorkspaceBusy(false)
           }
@@ -554,7 +780,7 @@ window.__ModuleLoader__.load({
             const payload = await readJson(`/documents${query ? `?${query}` : ''}`, { method: 'GET' })
             setDocuments(payload)
           } catch (failure) {
-            setNotice(failure && failure.message ? failure.message : '文档读取失败')
+            setNotice(failure && failure.message ? failure.message : LABELS.documentFailed)
           } finally {
             setDocumentsBusy(false)
           }
@@ -708,11 +934,11 @@ window.__ModuleLoader__.load({
                 setResult(text)
                 setMeta((previous) => ({ ...(previous || {}), ...(payload && payload.usage ? { usage: payload.usage } : {}), durationMs: payload && payload.durationMs }))
                 setStage(text ? 'done' : 'error')
-                if (!text) setError('模型返回了空结果，请重试')
+                if (!text) setError(LABELS.emptyResult)
               },
               onError: (payload) => {
                 settled = true
-                setError((payload && payload.message) || '增强失败')
+                setError((payload && payload.message) || LABELS.enhanceFailed)
                 setStage('error')
               },
             },
@@ -740,13 +966,13 @@ window.__ModuleLoader__.load({
               return text
             })
           } else {
-            setError((failure && failure.message) || '增强失败')
+            setError((failure && failure.message) || LABELS.enhanceFailed)
             setStage('error')
           }
         } finally {
           if (abortRef.current === controller) abortRef.current = null
         }
-      }, [captureInsertion, docPath, documents, depth, focus, methodology, mode, sessionCwd, sessionId, stage, trimmedDraft, variant, wantsDocument])
+      }, [captureInsertion, docPath, documents, depth, focus, lang, methodology, mode, sessionCwd, sessionId, stage, trimmedDraft, variant, wantsDocument])
 
       useEffect(() => () => {
         if (abortRef.current) abortRef.current.abort()
@@ -757,7 +983,7 @@ window.__ModuleLoader__.load({
       const writeDraft = useCallback(
         (text) => {
           if (!inputActions) {
-            setError('无法访问输入框')
+            setError(LABELS.noInput)
             return false
           }
           try {
@@ -766,13 +992,13 @@ window.__ModuleLoader__.load({
             } else if (typeof inputActions.insertText === 'function') {
               inputActions.insertText(text, insertionRef.current || { start: 0, end: 0, draftRev })
             } else {
-              setError('当前版本不支持回填输入框')
+              setError(LABELS.insertUnsupported)
               return false
             }
             if (typeof inputActions.persistDraft === 'function') inputActions.persistDraft()
             return true
           } catch (failure) {
-            setError((failure && failure.message) || '回填失败')
+            setError((failure && failure.message) || LABELS.insertFailed)
             return false
           }
         },
@@ -818,7 +1044,7 @@ window.__ModuleLoader__.load({
           setNotice(LABELS.copied)
           window.setTimeout(() => setNotice(''), 1600)
         } catch {
-          setError('复制失败，请手动选择文本')
+          setError(LABELS.copyFailed)
         }
       }, [result])
 
@@ -846,6 +1072,27 @@ window.__ModuleLoader__.load({
         : { left: '12px', width: `${PANEL_WIDTH}px`, bottom: '80px' }
 
       const renderPanel = () => {
+        const languageChips = h(
+          'div',
+          { className: 'dpe-langs', role: 'group', 'aria-label': LABELS.language, title: LABELS.languageHint },
+          ...LANGUAGES.map((id) =>
+            h(
+              'button',
+              {
+                key: id,
+                type: 'button',
+                className: 'dpe-check dpe-lang',
+                'data-active': lang === id ? 'true' : 'false',
+                'aria-pressed': lang === id,
+                'aria-label': `${LABELS.language}: ${LANGUAGE_LABELS[id]}`,
+                title: LABELS.languageHint,
+                onClick: () => setLang(id),
+              },
+              LANGUAGE_LABELS[id],
+            ),
+          ),
+        )
+
         const head = h(
           'div',
           { className: 'dpe-head' },
@@ -855,12 +1102,13 @@ window.__ModuleLoader__.load({
             h('div', { className: 'dpe-title' }, LABELS.title),
             h('div', { className: 'dpe-sub' }, LABELS.subtitle),
           ),
+          languageChips,
           h('button', { type: 'button', className: 'dpe-x', onClick: () => setOpen(false), 'aria-label': LABELS.close, title: LABELS.close }, '×'),
         )
 
         const tabs = h(
           'div',
-          { className: 'dpe-tabs', role: 'tablist', 'aria-label': '增强类型' },
+          { className: 'dpe-tabs', role: 'tablist', 'aria-label': LABELS.tabsLabel },
           ...catalogModes.map((entry) =>
             h(
               'button',
@@ -877,14 +1125,14 @@ window.__ModuleLoader__.load({
                   if (stage !== 'running') resetRun()
                 },
               },
-              entry.label,
+              w('mode', entry.id) || entry.label,
             ),
           ),
         )
 
         const cards = h(
           'div',
-          { className: 'dpe-cards', role: 'radiogroup', 'aria-label': '增强方式' },
+          { className: 'dpe-cards', role: 'radiogroup', 'aria-label': LABELS.cardsLabel },
           ...variantOptions.map((entry) =>
             h(
               'button',
@@ -905,8 +1153,14 @@ window.__ModuleLoader__.load({
               h(
                 'span',
                 { className: 'dpe-card-body' },
-                h('span', { className: 'dpe-card-title' }, entry.label),
-                entry.hint ? h('span', { className: 'dpe-card-hint', style: { display: 'block' } }, entry.hint) : null,
+                h('span', { className: 'dpe-card-title' }, w('variant', entry.id) || entry.label),
+                w('variant', entry.id, 'hint') || entry.hint
+                  ? h(
+                      'span',
+                      { className: 'dpe-card-hint', style: { display: 'block' } },
+                      w('variant', entry.id, 'hint') || entry.hint,
+                    )
+                  : null,
               ),
             ),
           ),
@@ -927,10 +1181,10 @@ window.__ModuleLoader__.load({
                       className: 'dpe-check',
                       'data-active': focus.includes(entry.id) ? 'true' : 'false',
                       'aria-pressed': focus.includes(entry.id) ? 'true' : 'false',
-                      title: entry.hint || entry.label,
+                      title: w('focus', entry.id, 'hint') || entry.hint || entry.label,
                       onClick: () => toggleFocus(entry.id),
                     },
-                    entry.label,
+                    w('focus', entry.id) || entry.label,
                   ),
                 ),
               )
@@ -951,16 +1205,16 @@ window.__ModuleLoader__.load({
                     className: 'dpe-check',
                     'data-active': depth === entry.id ? 'true' : 'false',
                     'aria-pressed': depth === entry.id ? 'true' : 'false',
-                    title: entry.hint || entry.label,
+                    title: w('depth', entry.id, 'hint') || entry.hint || entry.label,
                     onClick: () => setDepth(entry.id),
                   },
-                  entry.label,
+                  w('depth', entry.id) || entry.label,
                 ),
               ),
               h(
                 'span',
                 { className: 'dpe-label' },
-                (catalogDepths.find((entry) => entry.id === depth) || {}).hint || '',
+                w('depth', depth, 'hint') || (catalogDepths.find((entry) => entry.id === depth) || {}).hint || '',
               ),
             )
           : null
@@ -978,11 +1232,13 @@ window.__ModuleLoader__.load({
               'aria-label': LABELS.methodology,
             },
             ...(catalogMethods.length
-              ? catalogMethods.map((entry) => h('option', { key: entry.id, value: entry.id }, entry.label))
+              ? catalogMethods.map((entry) =>
+                  h('option', { key: entry.id, value: entry.id }, w('methodology', entry.id) || entry.label),
+                )
               : [h('option', { key: 'auto', value: 'auto' }, LABELS.methodologyAuto)]),
           ),
-          meta && meta.methodologyLabel
-            ? h('span', { className: 'dpe-label' }, `→ ${meta.methodologyLabel}`)
+          meta && (w('methodology', meta.methodology) || meta.methodologyLabel)
+            ? h('span', { className: 'dpe-label' }, `→ ${w('methodology', meta.methodology) || meta.methodologyLabel}`)
             : null,
         )
 
@@ -1071,7 +1327,7 @@ window.__ModuleLoader__.load({
                     },
                     h('option', { key: 'auto', value: '' }, LABELS.documentAuto),
                     ...documentOptions.map((entry) =>
-                      h('option', { key: entry.path, value: entry.path }, `${entry.path}（${entry.chars} 字）`),
+                      h('option', { key: entry.path, value: entry.path }, LABELS.docOption(entry.path, entry.chars)),
                     ),
                   )
                 : null,
@@ -1102,7 +1358,7 @@ window.__ModuleLoader__.load({
               meta.provider && meta.model ? h('span', null, `${LABELS.metaModel} ${meta.provider}/${meta.model}`) : null,
               meta.methodologyLabel ? h('span', null, `${LABELS.metaMethod} ${meta.methodologyLabel}`) : null,
               meta.depthLabel
-                ? h('span', null, `${LABELS.metaDepth} ${meta.depthLabel}${meta.depthBudget ? ` · ≤${meta.depthBudget} 字` : ''}`)
+                ? h('span', null, `${LABELS.metaDepth} ${meta.depthLabel}${meta.depthBudget ? LABELS.budgetSuffix(meta.depthBudget) : ''}`)
                 : null,
               wantsWorkspace ? h('span', null, `${LABELS.metaFiles} ${meta.workspaceScanned || 0}`) : null,
               wantsWorkspace ? h('span', null, `${LABELS.metaSecurity} ${meta.securityFindings || 0}`) : null,
@@ -1115,7 +1371,7 @@ window.__ModuleLoader__.load({
           : null
 
         const reasoningChars = progress && progress.stage === 'reasoning' ? Number(progress.chars || 0) : 0
-        const runningHint = reasoningChars > 0 ? `${LABELS.thinking}…（${reasoningChars} 字）` : LABELS.running
+        const runningHint = reasoningChars > 0 ? `${LABELS.thinking}…${LABELS.reasoningSuffix(reasoningChars)}` : LABELS.running
 
         let body = null
         if (stage === 'running') {          body = h(
@@ -1242,7 +1498,17 @@ window.__ModuleLoader__.load({
     return {
       inject: ['slots'],
       apply(ctx) {
-        beat('client-apply', 'v1.1.1')
+        beat('client-apply', 'v1.3.0')
+        // Follow DeepSeek Harness on first run; an explicit choice overrides it.
+        try {
+          const locale = typeof ctx.get === 'function' ? ctx.get('locale') : null
+          const active = locale && typeof locale.getLocale === 'function' ? locale.getLocale() : null
+          const id = active && typeof active.active === 'string' ? active.active : ''
+          defaultLanguage = id.toLowerCase().startsWith('en') ? 'en' : 'zh'
+          currentLanguage = defaultLanguage
+        } catch {
+          /* the locale service is optional */
+        }
         ctx.slots.inject('conversation.input.right', () =>
           ctx.slots.register(
             { name: 'conversation.input.right', id: 'prompt-enhance-trigger', order: 20 },

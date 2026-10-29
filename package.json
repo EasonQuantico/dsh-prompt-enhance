@@ -1,6 +1,6 @@
 {
   "name": "dsh-prompt-enhance",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "DSH plugin: turn a rough draft in the chat composer into an executable prompt at the length you pick (concise, default or thorough). Code mode reads the workspace and audits security; creative mode enriches or structures scripts; documentation mode reads an existing document's skeleton and fills in the gaps. Methodologies adapt between Superpowers, Prompt Optimizer, LangGPT and AiShort.",
   "type": "module",
   "license": "MIT",

@@ -36,8 +36,9 @@ function makeReact() {
   )
 }
 
-function loadPlugin() {
+function loadPlugin(options = {}) {
   let definition = null
+  const stored = options.stored === undefined ? null : options.stored
   const sandbox = {
     document: { baseURI: 'http://127.0.0.1:2896/' },
     window: {
@@ -46,6 +47,11 @@ function loadPlugin() {
       clearTimeout: () => {},
       addEventListener: () => {},
       removeEventListener: () => {},
+      localStorage: {
+        getItem: (key) => (key === 'dsh-prompt-enhance.prefs' ? stored : null),
+        setItem: () => {},
+        removeItem: () => {},
+      },
       __ModuleLoader__: { load: (loaded) => (definition = loaded) },
     },
     navigator: { clipboard: { writeText: async () => {} } },
@@ -64,8 +70,8 @@ function loadPlugin() {
   return definition
 }
 
-function instantiate() {
-  const definition = loadPlugin()
+function instantiate(options = {}) {
+  const definition = loadPlugin(options)
   const requested = []
   const plugin = definition.factory((id) => {
     requested.push(id)
@@ -194,6 +200,61 @@ test('browser half exposes the three depth levels', () => {
   assert.ok(source.includes('setDepth'), 'the level is selectable')
   assert.ok(source.includes('catalogDepths'), 'levels come from /state, not hard-coded labels')
   assert.ok(source.includes('depthBudget'), 'the result footer shows the quoted budget')
+})
+
+/** Pull the two copy maps out of the source and compare their key sets. */
+function copyKeys() {
+  const start = source.indexOf('const COPY = {')
+  const end = source.indexOf('const LANGUAGES = [', start)
+  assert.ok(start > 0 && end > start, 'the copy map should be a plain object literal')
+  const body = source.slice(start, end)
+  const zhStart = body.indexOf('zh: {')
+  const enStart = body.indexOf('en: {')
+  assert.ok(zhStart >= 0 && enStart > zhStart, 'both languages live in the map')
+  const keysOf = (block) => [...block.matchAll(/^ {8}([A-Za-z]+):/gm)].map((match) => match[1]).sort()
+  return { zh: keysOf(body.slice(zhStart, enStart)), en: keysOf(body.slice(enStart)) }
+}
+
+test('both languages carry the same copy', () => {
+  const { zh, en } = copyKeys()
+  assert.ok(zh.length >= 45, 'the Chinese map is complete')
+  assert.deepEqual(en, zh, 'English mirrors every key the interface uses')
+})
+
+test('a stored language switches the whole interface', () => {
+  const render = (stored) => {
+    const { plugin } = instantiate({ stored })
+    let Component = null
+    plugin.apply({
+      slots: { inject: (name, run) => run(), register: (target, component) => ((Component = component), () => {}) },
+    })
+    const tree = Component({
+      sessionId: 'session-1',
+      useInput: (selector) => selector({ draft: '', draftRev: 0 }),
+      useSessions: (selector) => selector({ byId: {} }),
+    })
+    return walk(tree)
+  }
+
+  const english = render(JSON.stringify({ lang: 'en' }))
+  assert.ok(english.texts.join('').includes('Enhance prompt'), 'the trigger label is English')
+  assert.equal(english.texts.join('').includes('提示词增强'), false, 'no Chinese copy is left over')
+
+  const chinese = render(null)
+  assert.ok(chinese.texts.join('').includes('提示词增强'), 'Chinese is the default')
+})
+
+test('the language follows the harness until the user picks one', () => {
+  assert.ok(source.includes("inject: ['slots']"), 'the locale service stays optional')
+  assert.ok(source.includes("ctx.get('locale')"), 'the first run reads the harness language')
+  assert.ok(source.includes('defaultLanguage'), 'the first-run language is derived, not hard-coded')
+  assert.ok(source.includes('pickLanguage'), 'a stored choice wins over the harness')
+  assert.ok(source.includes('dpe-lang'), 'the panel header carries the two language chips')
+  assert.ok(source.includes("LANGUAGE_LABELS = { zh: '中文', en: 'English' }"), 'chips are labelled in their own language')
+  assert.ok(
+    source.includes('writePrefs({ mode, variants, focus, depth, methodology, docPath, lang })'),
+    'the choice is remembered with the other preferences',
+  )
 })
 
 test('browser half obeys the plugin rules', () => {

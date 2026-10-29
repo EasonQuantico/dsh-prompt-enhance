@@ -4,6 +4,8 @@ README 里用到的图，两类：
 
 - **四张 PNG 是界面示意（mockup）**，不是运行截图。它们按 `client.js` 的真实槽位、文案（`LABELS`）、
   配色（`--dsw-alias-*`）绘制，用来解释按钮在哪、面板有什么、结果怎么落盘。
+- **两张 PNG 是真截图**：`ui-language-zh.png` / `ui-language-en.png` 来自一次独立测试台运行
+  （`.dsh-test-*` profile + headless Chrome 走 CDP），只裁了面板区域，没有改任何像素。
 - **五张 SVG 是示意图**，纯手写矢量，用于链路、打分矩阵、证据装配与三档篇幅标尺。
 
 | 文件 | 用在哪 | 生成脚本 |
@@ -12,6 +14,8 @@ README 里用到的图，两类：
 | `ui-panel.png` | 面板 idle 态（代码大类）：三个大类 tab / 两种方式 / 方向 / 档位 / 方法论 / 工作区 | `generate-mockups.py` |
 | `ui-panel-doc.png` | 面板「文档」大类态：读文档后补写 / 按类型起草、文档信息块（字数、标题数、大纲、候选下拉、刷新）、档位、方法论与增强按钮 | `generate-mockups.py` |
 | `ui-result.png` | 面板 done 态：可编辑结果、四种落盘、元信息 | `generate-mockups.py` |
+| `ui-language-zh.png` | `界面语言 / Interface language`：中文面板（真截图） | 无（截图，来自测试台） |
+| `ui-language-en.png` | `界面语言 / Interface language`：English panel（真截图） | 无（截图，来自测试台） |
 | `architecture.svg` | 一次增强的完整链路（浏览器半 ↔ 宿主半） | `generate-diagrams.py` |
 | `methodology.svg` | 四方式 × 四方法论的加权矩阵 | `generate-diagrams.py` |
 | `evidence.svg` | 工作区证据 → 只读证据块 | `generate-diagrams.py` |

@@ -32,6 +32,7 @@ DSH（DeepSeek Harness）插件。在输入框右侧加一个 **✨ 提示词增
 - [方法论自适应](#方法论自适应)
 - [安装](#安装)
 - [使用](#使用)
+- [界面语言](#界面语言)
 - [配置](#配置)
 - [工作原理](#工作原理)
 - [HTTP 接口](#http-接口)
@@ -306,6 +307,22 @@ Add-Content "$HOME\.dsh\profiles\<profile>\cordis.patch.yml" "# reload prompt-en
 - 增强结果只是**写进输入框**，还可以继续编辑，确认后再发送。
 - 档位按需选：**简洁** 适合只要骨架、后面自己填细节（也最省 token）；**严谨** 适合要把活交给别人
   或别的代理执行。档位只约束篇幅，不改方法论。
+
+## 界面语言
+
+面板右上角有两颗小胶囊：**中文** 与 **English**。点一下，整个插件的界面文案立刻换语言，不需要刷新页面。
+
+- 第一次运行时跟随 DeepSeek Harness 的界面语言（Harness 是英文就默认英文）；之后以你点过的那个为准。
+- 选择记在这个浏览器的 `dsh-prompt-enhance.prefs` 里（`lang` 字段），刷新、重启都保持。
+- 只切换**本插件**的文案。DeepSeek Harness 自己的界面语言不跟着变——这是刻意的，插件不该改宿主的设置。
+- 两套文案键完全一致（测试 `both languages carry the same copy` 会校验），按钮、空状态、错误提示都在里面。
+
+| 中文 | English |
+| --- | --- |
+| ![中文面板：右上角是「中文」胶囊](docs/images/ui-language-zh.png) | ![English panel: the English chip is active](docs/images/ui-language-en.png) |
+
+面板自己的词表（代码 / 创作 / 文档、六种方式、优化方向、档位、方法论名）也一起切——宿主
+`/state` 传的是中文标签，客户端按 id 换成当前语言，所以切到英文后不会出现半中半英。
 
 ## 配置
 

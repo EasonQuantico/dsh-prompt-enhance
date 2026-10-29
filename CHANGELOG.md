@@ -13,6 +13,42 @@ All notable changes to this project are documented here. The format follows
   copy is replaced by a junction (or re-installed). Also documents that the Web GUI port changes
   between launches.
 
+## [1.3.0] — 2026-10-29
+
+Bilingual interface: the panel can switch its own copy between Chinese and English, instantly and
+persistently, without touching the harness language.
+
+### Added
+
+- `COPY` map with a `zh` and an `en` half in `client.js`; every user-visible string (buttons, empty
+  states, error messages, aria labels, option text) now goes through it.
+- Two language chips in the panel header (`中文` / `English`), rendered from `LANGUAGES` and
+  `LANGUAGE_LABELS`; clicking one re-renders the whole panel in that language with no page reload.
+- The first run follows the harness language (`ctx.get('locale').getLocale().active`), so an English
+  harness starts in English; the user's pick is then stored under `lang` in
+  `dsh-prompt-enhance.prefs` and wins on every later load.
+- Three tests: `both languages carry the same copy` (key sets must match), `a stored language switches
+  the whole interface`, `the language follows the harness until the user picks one`.
+
+### Changed
+
+- The `LABELS` object is now `COPY[lang]`; the component keeps a local `LABELS` binding so the existing
+  call sites did not need rewriting.
+- Transport errors (`requestFailed`, `streamUnsupported`) read from the same map instead of hard-coded
+  Chinese.
+
+### Notes
+
+- Only the plugin's copy changes. DeepSeek Harness keeps its own language; the locale service stays an
+  optional dependency (`inject` is still `['slots']`).
+
+### Docs
+
+- Both READMEs gained an “Interface language / 界面语言” section: what the chips do, that the first run
+  follows the harness, where the choice is stored, and that the harness language is left alone.
+- Two real screenshots from a bench run (`docs/images/ui-language-zh.png`, `ui-language-en.png`), plus
+  a note in `docs/images/README.md` about which pictures are mockups and which are captures.
+
 ## [1.2.0] — 2026-10-26
 
 Length control: every request now carries a depth level, and Superpowers' thorough band is the

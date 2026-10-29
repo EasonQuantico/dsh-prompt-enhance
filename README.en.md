@@ -327,6 +327,28 @@ Tips:
   Known limitations section of the README”.
 - The enhanced prompt is only **written into the composer**; edit it further and send it yourself.
 
+## Interface language
+
+Two small chips sit in the top-right corner of the panel: **中文** and **English**. Click one and the whole
+plugin interface switches immediately, with no page reload.
+
+- The first run follows the DeepSeek Harness interface language (English harness, English plugin). After
+  that your pick wins.
+- The choice is stored in this browser under `dsh-prompt-enhance.prefs` (`lang`), so a reload or a restart
+  keeps it.
+- Only the **plugin's** copy changes. DeepSeek Harness keeps its own language — the plugin does not touch
+  the host's settings.
+- Both maps carry exactly the same keys (the `both languages carry the same copy` test checks it),
+  including buttons, empty states and error messages.
+
+| 中文 | English |
+| --- | --- |
+| ![Chinese panel: the 中文 chip is active](docs/images/ui-language-zh.png) | ![English panel: the English chip is active](docs/images/ui-language-en.png) |
+
+The panel's own vocabulary (Code / Creative / Document, the six styles, the focus chips, the length
+levels, the technique names) switches too: `/state` speaks Chinese, so the client maps each id to the
+language on screen — no half-translated panel.
+
 ## Configuration
 
 The `config` block of the `prompt-enhance` row in `cordis.patch.yml`:

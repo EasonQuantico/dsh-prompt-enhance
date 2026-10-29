@@ -88,7 +88,7 @@ so every write must be guarded by loopback + same-origin + JSON content-type che
 ```json
 {
   "ok": true,
-  "version": "1.2.0",
+  "version": "1.3.0",
   "provider": "workbuddy2api-hub",
   "model": "deepseek-v4.1-flash",
   "modelSource": "session-default",
@@ -287,8 +287,15 @@ UI requirements:
    - Result step: editable textarea with the enhanced prompt and
      `替换输入框` (`setDraft`), `插入到光标` (`insertText` with the span captured at
      start when `span.draftRev === currentDraftRev`), `复制`, `再试一次`.
+   - Language chips (`中文` / `English`) in the panel header, right of the title. Clicking one
+     switches every string in the panel immediately (no reload) and stores the choice as `lang`
+     in `dsh-prompt-enhance.prefs`. The first run without a stored choice follows the harness
+     language via `ctx.get('locale')?.getLocale?.().active` (English harness → English), and the
+     locale service stays an optional dependency — `inject` remains `['slots']`.
 3. Never read another plugin's DOM, never touch `document.body`, never install a global
    key handler; Escape closes the panel when it is open, click-outside closes it too.
 4. All colours/spacing from `--dsw-alias-*` tokens with neutral fallbacks; class names
    prefixed `dpe-`; inline `<style>` injected once by the component (removed on unmount).
-5. Chinese UI text (this build targets zh users); keep strings in one `LABELS` object.
+5. Two complete copy maps (`zh`, `en`) with identical keys — every user-visible string lives in
+   them, including error text, aria labels and empty states. Language is a presentation concern:
+   it never goes to the host, and the harness language is never changed.
