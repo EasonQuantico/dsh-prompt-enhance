@@ -266,3 +266,31 @@ test('browser half obeys the plugin rules', () => {
   assert.ok(source.includes("'conversation.input.right'"), 'slot name lives in source')
   assert.ok(source.includes('dsh-prompt-enhance.prefs'), 'preferences key is namespaced')
 })
+
+test('panel styles follow the harness styling rules', () => {
+  const css = source.slice(source.indexOf('const CSS = `'), source.indexOf('`.trim()', source.indexOf('const CSS = `')))
+  assert.ok(css.includes('var(--dsw-alias-'), 'semantic alias tokens carry colour')
+  assert.equal(/rgba?\(/.test(css), false, 'no rgb()/rgba() literals')
+  assert.equal(/hsl/.test(css), false, 'no hsl() literals')
+  const hex = css.match(/#[0-9a-fA-F]{3,8}\b/g) || []
+  assert.deepEqual(hex, ['#fff', '#fff'], 'only the filled button text uses #fff, as the harness does')
+  assert.equal(/\[data-theme/.test(css), false, 'no theme selectors')
+  assert.equal(/::-webkit-scrollbar/.test(css), false, 'no component scrollbar selectors')
+  assert.ok(css.includes('corner-shape: round'), 'capsules pair their radius with corner-shape')
+  assert.ok(/@media \(hover: hover\)/.test(css), 'hover styles sit behind the hover query')
+  assert.ok(css.includes('box-shadow: var(--dsw-elevation-panel)'), 'the panel is an elevated surface')
+  const roundBlocks = css
+    .split('}')
+    .filter((block) => /border-radius:\s*(999px|50%|100%)\s*;/.test(block))
+  assert.ok(roundBlocks.length > 0, 'capsules and circles exist')
+  for (const block of roundBlocks) {
+    assert.ok(block.includes('corner-shape: round'), `capsule without corner-shape: ${block.trim().slice(0, 60)}`)
+  }
+  const halfPixel = css.match(/border(?!-radius)[-a-z]*:\s*[\d.]+px/g) || []
+  const neutralWidths = halfPixel.map((decl) => decl.replace(/^border[-a-z]*:\s*/, ''))
+  assert.ok(
+    neutralWidths.every((width) => ['0.5px', '1px', '1.5px', '4px'].includes(width)),
+    'borders are hairline, state 1px, or a radio indicator (1.5px ring, 4px selected)',
+  )
+})
+

@@ -88,12 +88,12 @@ so every write must be guarded by loopback + same-origin + JSON content-type che
 ```json
 {
   "ok": true,
-  "version": "1.3.0",
+  "version": "1.4.0",
   "provider": "workbuddy2api-hub",
   "model": "deepseek-v4.1-flash",
   "modelSource": "session-default",
   "workspace": { "root": "C:\\...\\default-workspace", "source": "config|registry|session|cwd" },
-  "limits": { "maxPromptChars": 12000, "maxWorkspaceFiles": 40, "maxWorkspaceBytes": 60000, "maxDocumentChars": 16000 },
+  "limits": { "maxPromptChars": 12000, "maxWorkspaceFiles": 40, "maxWorkspaceBytes": 60000, "maxExcerptChars": 3500, "maxScanFiles": 60, "maxScannedBytes": 921600, "maxListedDocuments": 800, "maxDocumentChars": 16000 },
   "modes": [
     { "id": "code", "label": "代码", "variants": [
         { "id": "code-read", "label": "读取工作区后优化", "hint": "先扫描工作区再改写" },

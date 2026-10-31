@@ -13,6 +13,44 @@ All notable changes to this project are documented here. The format follows
   copy is replaced by a junction (or re-installed). Also documents that the Web GUI port changes
   between launches.
 
+## [1.4.0] — 2026-10-31
+
+Audit against the official DeepSeek Harness development guide (styling, defensive client patterns,
+plugin compatibility) and the fixes it produced.
+
+### Added
+
+- `engines.dsh: ">=0.2.0-rc.2"` so the harness judges compatibility from the plugin manifest (DSH
+  0.2.1-alpha.3 reads `engines.dsh` first and falls back to `peerDependencies`).
+- Four workspace budgets are now config fields instead of hardcoded constants: `maxExcerptChars`
+  (3500), `maxScanFiles` (60), `maxScannedBytes` (921600), `maxListedDocuments` (800). They are
+  validated like the other numeric keys and reported by `/state`.
+- A “Compatibility and the official guide” section in both READMEs, mapping each requirement to the
+  place in this plugin that satisfies it.
+
+### Changed
+
+- The panel CSS was rewritten to follow `docs/web-styling.zh.md`: no colour literals (only the
+  filled button keeps the harness's own `#fff` text), 0.5px neutral hairlines with 1px state borders,
+  `corner-shape: round` on every capsule and circle, all hover styles behind `@media (hover: hover)`,
+  every `font-size` paired with a `line-height`, and the panel drawn as an elevated surface
+  (`border: 0` + `box-shadow: var(--dsw-elevation-panel)`) instead of a bordered box.
+- `useLayoutEffect` for panel placement now carries the reason it cannot be `useEffect` (a post-paint
+  measurement would flash the fixed panel at the wrong spot).
+
+### Fixed
+
+- Thirteen silent `catch` blocks now name the error and why they swallow it (unreadable file,
+  vanished directory, absent registry, already-closed response, released route), as the developer
+  guide requires of empty catches.
+
+### Tests
+
+- `panel styles follow the harness styling rules`: fails if a colour literal, a theme selector, a
+  custom scrollbar, an unpaired capsule radius or a non-hairline neutral border sneaks back in.
+- `workspace excerpts honour maxExcerptChars from the config`: proves the new budget actually reaches
+  the digest, not just `/state`.
+
 ## [1.3.0] — 2026-10-29
 
 Bilingual interface: the panel can switch its own copy between Chinese and English, instantly and

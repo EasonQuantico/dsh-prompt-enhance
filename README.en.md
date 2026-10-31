@@ -34,6 +34,7 @@ structured, executable, verifiable prompt — written straight into the input bo
 - [Installation](#installation)
 - [Usage](#usage)
 - [Configuration](#configuration)
+- [Compatibility and the official guide](#compatibility-and-the-official-guide)
 - [How it works](#how-it-works)
 - [HTTP API](#http-api)
 - [Security and privacy](#security-and-privacy)
@@ -360,9 +361,37 @@ The `config` block of the `prompt-enhance` row in `cordis.patch.yml`:
 | `maxPromptChars` | `12000` | Draft character limit; larger drafts get 413 |
 | `maxWorkspaceFiles` | `40` | Cap on files listed in the digest |
 | `maxWorkspaceBytes` | `60000` | Total byte budget for file excerpts |
+| `maxExcerptChars` | `3500` | Per-file excerpt budget; longer excerpts are cut and labelled |
+| `maxScanFiles` | `60` | Cap on files inspected by the heuristic security scan |
+| `maxScannedBytes` | `921600` | Total bytes read while scanning |
+| `maxListedDocuments` | `800` | Files visited when ranking candidate documents |
 | `maxDocumentChars` | `16000` | How much document text the documentation styles read; longer files are truncated and labelled |
 | `maxOutputTokens` | `8000` | Output budget per run; reasoning models spend part of it on thinking |
 | `requestTimeoutMs` | `180000` | Per-run timeout |
+
+Every numeric key is validated: a non-number or a non-positive value falls back to the default.
+
+## Compatibility and the official guide
+
+The package declares `engines.dsh: ">=0.2.0-rc.2"` (DSH 0.2.1-alpha.3 and later judge plugin
+compatibility from `engines.dsh`, falling back to `peerDependencies` when it is missing) and
+`engines.node: ">=20"`.
+
+The implementation follows the [DeepSeek Harness development guide](https://github.com/deepseek-ai/deepseek-harness/blob/master/README.zh.md#%E5%BC%80%E5%8F%91):
+
+| Requirement | How this plugin meets it |
+| --- | --- |
+| Registrations are effects | Routes are registered inside `ctx.inject(['webServer'])` → `webCtx.effect(() => webServer.register(...))`, and the disposer is released by that effect |
+| No hardcoded tunables | All ten `config` fields are editable from `cordis.patch.yml`; numeric keys are validated in `apply()` |
+| An empty `catch` names the error and why | Every silent catch carries a one-line reason (unreadable file, vanished directory, absent registry) |
+| The client renders through slots only | A module-scope component is registered on `conversation.input.right`; it never touches `document.body` or another plugin's DOM |
+| Components take no Cordis context and do not subscribe themselves | The component uses only the slot's `useInput` / `useSessions` / `inputActions` plus local state |
+| Styling uses semantic tokens only | `--dsw-alias-*` / `--dsw-elevation-*` / `--dsw-radius-*` only, no colour literals (the filled button keeps the harness's own `#fff` text) |
+| 0.5px neutral borders, no custom scrollbars, shared menu container | Neutral borders are 0.5px, state borders 1px; no `::-webkit-scrollbar`; the panel is an elevated surface, not a menu |
+| Client copy is locale-owned | The panel ships `COPY.zh` / `COPY.en` and switches between them with the language chips |
+
+Tests pin these conventions down (`test/client.test.mjs` for the styling rules, `test/host.test.mjs`
+for the budgets), so future edits cannot drift from them silently.
 
 ## How it works
 

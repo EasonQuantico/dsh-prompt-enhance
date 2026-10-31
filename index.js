@@ -24,7 +24,7 @@ import {
   selectMethodology,
 } from './strategies.js'
 
-export const VERSION = '1.3.0'
+export const VERSION = '1.4.0'
 /** `llm` is required for the enhance route; `webServer` is injected locally below. */
 export const inject = ['llm']
 const ROUTE_PREFIX = '/prompt-enhance/api'
@@ -37,6 +37,10 @@ const DEFAULTS = {
   maxPromptChars: 12000,
   maxWorkspaceBytes: 60000,
   maxWorkspaceFiles: 40,
+  maxExcerptChars: 3500,
+  maxScanFiles: 60,
+  maxScannedBytes: 921600,
+  maxListedDocuments: 800,
   maxDocumentChars: 16000,
   maxOutputTokens: 8000,
   requestTimeoutMs: 180000,
@@ -126,6 +130,7 @@ function isSameOrigin(request) {
   try {
     return new URL(origin).host === request.headers.host
   } catch {
+    // A malformed Origin header cannot match the request host, so it is denied.
     return false
   }
 }
@@ -242,6 +247,8 @@ async function walkFiles(root, budget) {  const files = []
     try {
       entries = await readdir(dir, { withFileTypes: true })
     } catch {
+      // Unreadable directories (permissions, race with deletion) are skipped so a
+      // single unreadable branch cannot fail the whole workspace scan.
       return
     }
     entries.sort((a, b) => (a.isDirectory() === b.isDirectory() ? a.name.localeCompare(b.name) : a.isDirectory() ? -1 : 1))
@@ -280,6 +287,8 @@ async function readText(fullPath, limit) {
     const text = await readFile(fullPath, 'utf8')
     return text.length > limit ? `${text.slice(0, limit)}\n…（已截断 ${text.length - limit} 字符）` : text
   } catch {
+    // Missing, unreadable or non-UTF-8 files yield no excerpt; the caller treats
+    // an empty string as "nothing to quote" rather than an error.
     return ''
   }
 }
@@ -338,7 +347,7 @@ async function collectWorkspace(root, limits) {
   const excerptTargets = ranked.filter((rel) => isTextFile(basename(rel))).slice(0, 10)
 
   // Security scan covers a wider but still bounded set of small text files.
-  const scanTargets = ranked.filter((rel) => isTextFile(basename(rel))).slice(0, 60)
+  const scanTargets = ranked.filter((rel) => isTextFile(basename(rel))).slice(0, limits.maxScanFiles)
   const scanEntries = []
   let scannedBytes = 0
   for (const rel of scanTargets) {
@@ -346,7 +355,7 @@ async function collectWorkspace(root, limits) {
     if (!text) continue
     scannedBytes += text.length
     scanEntries.push({ path: rel, text })
-    if (scannedBytes > 900 * 1024) break
+    if (scannedBytes > limits.maxScannedBytes) break
   }
 
   const excerpts = []
@@ -354,7 +363,7 @@ async function collectWorkspace(root, limits) {
   for (const rel of excerptTargets) {
     const remaining = limits.maxWorkspaceBytes - usedBytes
     if (remaining <= 500) break
-    const text = await readText(join(root, rel), Math.min(3500, remaining))
+    const text = await readText(join(root, rel), Math.min(limits.maxExcerptChars, remaining))
     if (!text) continue
     usedBytes += text.length
     excerpts.push({ path: rel, text })
@@ -499,6 +508,8 @@ async function readDocumentText(fullPath, maxChars) {
       truncated,
     }
   } catch {
+    // The document route maps `null` to the `doc-unreadable` code, so the reason
+    // stays with the handler instead of being guessed here.
     return null
   }
 }
@@ -507,8 +518,9 @@ async function readDocumentText(fullPath, maxChars) {
  * Rank the readable documents of a workspace: a filename mentioned in the prompt
  * wins, `docs/` beats repo meta files, and recently touched files break ties.
  */
-async function listDocuments(root, prompt, limit = 24) {
-  const { files } = await walkFiles(root, { maxFiles: 800 })
+async function listDocuments(root, prompt, limit = 24, limits = {}) {
+  const maxFiles = Math.max(Number(limits.maxListedDocuments) || 0, 200)
+  const { files } = await walkFiles(root, { maxFiles })
   const lowered = String(prompt || '').toLowerCase()
   const month = 1000 * 60 * 60 * 24 * 30
   const now = Date.now()
@@ -521,6 +533,8 @@ async function listDocuments(root, prompt, limit = 24) {
     try {
       info = await stat(join(root, rel))
     } catch {
+      // The entry disappeared between readdir and stat; skip it instead of
+      // failing the whole listing.
       continue
     }
     if (!info.isFile() || info.size > DOC_LIMIT_BYTES || info.size < 24) continue
@@ -558,7 +572,7 @@ async function listDocuments(root, prompt, limit = 24) {
  */
 async function collectDocument(root, { docPath, prompt, limits }) {
   const startedAt = Date.now()
-  const listed = await listDocuments(root, prompt)
+  const listed = await listDocuments(root, prompt, 24, limits)
   let target = null
   if (typeof docPath === 'string' && docPath.trim()) {
     target = resolveInside(root, docPath)
@@ -668,7 +682,18 @@ export function apply(ctx, rawConfig = {}) {
     const value = rawConfig?.[key]
     if (value !== undefined && value !== null && value !== '') config[key] = value
   }
-  for (const key of ['maxPromptChars', 'maxWorkspaceBytes', 'maxWorkspaceFiles', 'maxDocumentChars', 'maxOutputTokens', 'requestTimeoutMs']) {
+  for (const key of [
+    'maxPromptChars',
+    'maxWorkspaceBytes',
+    'maxWorkspaceFiles',
+    'maxExcerptChars',
+    'maxScanFiles',
+    'maxScannedBytes',
+    'maxListedDocuments',
+    'maxDocumentChars',
+    'maxOutputTokens',
+    'requestTimeoutMs',
+  ]) {
     const numeric = Number(config[key])
     config[key] = Number.isFinite(numeric) && numeric > 0 ? numeric : DEFAULTS[key]
   }
@@ -747,7 +772,8 @@ export function apply(ctx, rawConfig = {}) {
         try {
           dispose?.()
         } catch {
-          /* ignore */
+          // The route registry already released the handler during teardown; a
+          // second throw here would mask that and abort the remaining effects.
         }
       }
     }, 'prompt-enhance: http routes')
@@ -773,6 +799,10 @@ async function handleState(ctx, state, response) {
       maxPromptChars: state.config.maxPromptChars,
       maxWorkspaceFiles: state.config.maxWorkspaceFiles,
       maxWorkspaceBytes: state.config.maxWorkspaceBytes,
+      maxExcerptChars: state.config.maxExcerptChars,
+      maxScanFiles: state.config.maxScanFiles,
+      maxScannedBytes: state.config.maxScannedBytes,
+      maxListedDocuments: state.config.maxListedDocuments,
       maxDocumentChars: state.config.maxDocumentChars,
     },
     modes: MODES,
@@ -823,7 +853,7 @@ async function handleDocuments(ctx, state, url, response) {
   }
 
   const startedAt = Date.now()
-  const listed = await listDocuments(root, prompt)
+  const listed = await listDocuments(root, prompt, 24, state.config)
   let selected = null
   const chosenPath = requestedPath || (listed.documents.length ? listed.documents[0].path : '')
   const target = chosenPath ? resolveInside(root, chosenPath) : null

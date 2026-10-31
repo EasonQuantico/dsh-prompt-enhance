@@ -34,6 +34,7 @@ DSH（DeepSeek Harness）插件。在输入框右侧加一个 **✨ 提示词增
 - [使用](#使用)
 - [界面语言](#界面语言)
 - [配置](#配置)
+- [兼容性与官方指引](#兼容性与官方指引)
 - [工作原理](#工作原理)
 - [HTTP 接口](#http-接口)
 - [安全与隐私](#安全与隐私)
@@ -335,9 +336,36 @@ Add-Content "$HOME\.dsh\profiles\<profile>\cordis.patch.yml" "# reload prompt-en
 | `maxPromptChars` | `12000` | 草稿字符上限，超出返回 413 |
 | `maxWorkspaceFiles` | `40` | 摘要里列出的文件数上限 |
 | `maxWorkspaceBytes` | `60000` | 关键文件摘录的总字节上限 |
+| `maxExcerptChars` | `3500` | 单个文件摘录进摘要的字符上限，超出标注「已截断」 |
+| `maxScanFiles` | `60` | 启发式安全扫描的文件数上限 |
+| `maxScannedBytes` | `921600` | 安全扫描累计读取的字节上限 |
+| `maxListedDocuments` | `800` | 文档模式候选排序时遍历的文件数上限 |
 | `maxDocumentChars` | `16000` | 文档模式读取的原文上限，超出会截断并标注 |
 | `maxOutputTokens` | `8000` | 单次增强的输出上限；推理型模型会先吃掉一部分 |
 | `requestTimeoutMs` | `180000` | 单次增强超时 |
+
+所有数值键都会被校验：非正数或非数字回落到默认值。
+
+## 兼容性与官方指引
+
+包声明了 `engines.dsh: ">=0.2.0-rc.2"`（DSH 0.2.1-alpha.3 起以 `engines.dsh` 判定插件兼容性，
+缺失时回退 `peerDependencies`），`engines.node: ">=20"`。
+
+实现按官方开发指引对齐（对照 [DeepSeek Harness 开发文档](https://github.com/deepseek-ai/deepseek-harness/blob/master/README.zh.md#%E5%BC%80%E5%8F%91)）：
+
+| 官方要求 | 本插件的做法 |
+| --- | --- |
+| 注册即 effect | 路由用 `ctx.inject(['webServer'])` + `webCtx.effect(() => webServer.register(...))`，disposer 在 effect 返回里释放 |
+| 插件不得硬编码可调项 | 十个 `config` 字段全部可从 `cordis.patch.yml` 改，数值键在 `apply()` 校验 |
+| 空 `catch` 要写明原因 | 每处静默容错都带一行说明（文件读不出、目录被删、registry 缺失等） |
+| 客户端只经槽位渲染 | 注册模块作用域组件到 `conversation.input.right`，不碰 `document.body`、不读别的插件 DOM |
+| 组件不接收 Cordis context、不在组件体内订阅 | 组件只用槽位注入的 `useInput`/`useSessions`/`inputActions` 与本地 state |
+| 样式只用语义 token | 全部 `--dsw-alias-*` / `--dsw-elevation-*` / `--dsw-radius-*`，无颜色字面量（填充按钮文字沿用宿主的 `#fff`） |
+| 中性边框 0.5px、滚动条不自定义、菜单用共享容器 | 中性边框 0.5px、状态色 1px；无 `::-webkit-scrollbar`；面板是有 elevation 投影的浮层而非菜单 |
+| 客户端文案归 locale | 自带 `COPY.zh` / `COPY.en` 两套字典，由面板里的语言胶囊切换 |
+
+测试把这些约定固化成断言（`test/client.test.mjs` 的样式规则用例、`test/host.test.mjs` 的预算用例），
+所以以后改样式或配置不会悄悄偏离。
 
 ## 工作原理
 

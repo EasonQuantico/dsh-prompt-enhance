@@ -15,5 +15,12 @@
         maxDocumentChars: 16000
         maxWorkspaceBytes: 60000
         maxWorkspaceFiles: 40
+        # Per-file excerpt length quoted into the workspace digest.
+        maxExcerptChars: 3500
+        # Heuristic security scan: files inspected and bytes read.
+        maxScanFiles: 60
+        maxScannedBytes: 921600
+        # Files visited when ranking candidate documents.
+        maxListedDocuments: 800
         maxOutputTokens: 8000
         requestTimeoutMs: 180000

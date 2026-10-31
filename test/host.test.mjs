@@ -272,6 +272,10 @@ test('/state reports the route, workspace and vocabulary', async () => {
     assert.equal(body.modelSource, 'config')
     assert.equal(body.limits.maxPromptChars, 200)
     assert.equal(body.limits.maxDocumentChars, 16000)
+    assert.equal(body.limits.maxExcerptChars, 3500)
+    assert.equal(body.limits.maxScanFiles, 60)
+    assert.equal(body.limits.maxScannedBytes, 921600)
+    assert.equal(body.limits.maxListedDocuments, 800)
     assert.deepEqual(
       body.modes.map((mode) => mode.id),
       ['code', 'creative', 'doc'],
@@ -296,6 +300,37 @@ test('/state survives a missing model route', async () => {
   const body = (await call(handler)).json()
   assert.equal(body.modelSource, 'none')
   assert.equal(body.provider, '')
+})
+
+/* ------------------------------------------------------------------ */
+/* workspace budgets                                                  */
+/* ------------------------------------------------------------------ */
+
+test('workspace excerpts honour maxExcerptChars from the config', async () => {
+  const root = await makeFixture()
+  const { stream, calls } = recordingStream([
+    { type: 'text-delta', text: '# 任务' },
+    { type: 'finish', reason: { kind: 'stop' } },
+  ])
+  try {
+    const { handler } = mount({ stream, config: { maxExcerptChars: 40 } })
+    await call(handler, {
+      method: 'POST',
+      url: '/prompt-enhance/api/enhance',
+      headers: { 'sec-fetch-site': 'same-origin' },
+      body: {
+        prompt: '补全这个工具',
+        mode: 'code',
+        variant: 'code-read',
+        focus: ['framework'],
+        cwd: root,
+      },
+    })
+    const text = calls[0].messages[0].content[0].text
+    assert.match(text, /…（已截断 \d+ 字符）/, 'excerpts are cut at the configured budget')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
 })
 
 /* ------------------------------------------------------------------ */
