@@ -13,6 +13,21 @@ All notable changes to this project are documented here. The format follows
   copy is replaced by a junction (or re-installed). Also documents that the Web GUI port changes
   between launches.
 
+## [1.4.1] — 2026-10-31
+
+Layout follow-ups found by running the panel in a real browser at 1440×900 after the 1.4.0 styling
+pass.
+
+### Fixed
+
+- The panel could be taller than the space above the composer, because `max-height` excluded the
+  panel's own padding (`content-box`): it now measures with `box-sizing: border-box`, so the panel
+  stays inside the viewport instead of running off the top edge.
+- The workspace note listed four full paths and wrapped to four lines; it now shows three paths
+  shortened to their tails so the note stays two lines.
+- The workspace and document refresh buttons borrowed the “enhancing…” string while reading; they now
+  have their own “reading…” copy in both languages.
+
 ## [1.4.0] — 2026-10-31
 
 Audit against the official DeepSeek Harness development guide (styling, defensive client patterns,

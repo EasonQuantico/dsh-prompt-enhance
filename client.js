@@ -45,6 +45,7 @@ window.__ModuleLoader__.load({
         methodologyAuto: '自适应',
         workspace: '工作区',
         workspaceRefresh: '刷新',
+        workspaceBusy: '读取中…',
         workspaceFiles: (n) => `${n} 个文件`,
         workspaceNone: '尚未读取',
         workspaceSecurity: (n) => (n ? `安全扫描命中 ${n} 处` : '安全扫描无命中'),
@@ -117,6 +118,7 @@ window.__ModuleLoader__.load({
         methodologyAuto: 'Auto',
         workspace: 'Workspace',
         workspaceRefresh: 'Refresh',
+        workspaceBusy: 'Reading…',
         workspaceFiles: (n) => `${n} file${n === 1 ? '' : 's'}`,
         workspaceNone: 'Not read yet',
         workspaceSecurity: (n) => (n ? `${n} security hit${n === 1 ? '' : 's'}` : 'No security hits'),
@@ -348,6 +350,12 @@ window.__ModuleLoader__.load({
       return LANGUAGES.includes(saved) ? saved : defaultLanguage
     }
 
+    /** Keep the tail of a workspace path so the note stays one line. */
+    function shortPath(path) {
+      const text = String(path || '')
+      return text.length > 26 ? `…${text.slice(-25)}` : text
+    }
+
     /* ---------------------------------------------------------------- */
     /* transport                                                         */
     /* ---------------------------------------------------------------- */
@@ -500,6 +508,7 @@ window.__ModuleLoader__.load({
 
 .dpe-panel {
   position: fixed; z-index: 60; display: flex; flex-direction: column; gap: 10px;
+  box-sizing: border-box;
   padding: 14px; border: 0; border-radius: var(--dsw-radius-panel, 14px);
   background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary);
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
@@ -1298,7 +1307,7 @@ window.__ModuleLoader__.load({
                     null,
                     `${LABELS.workspaceFiles(workspace.fileCount)} · ${LABELS.workspaceSecurity(workspace.security ? workspace.security.findings.length : 0)}`,
                     workspace.files && workspace.files.length
-                      ? h('div', { className: 'dpe-note-mono' }, workspace.files.slice(0, 4).join(' · '))
+                      ? h('div', { className: 'dpe-note-mono' }, workspace.files.slice(0, 3).map(shortPath).join(' · '))
                       : null,
                   )
                 : null,
@@ -1311,7 +1320,7 @@ window.__ModuleLoader__.load({
                   disabled: workspaceBusy,
                   onClick: () => loadWorkspace(true),
                 },
-                workspaceBusy ? LABELS.running : LABELS.workspaceRefresh,
+                workspaceBusy ? LABELS.workspaceBusy : LABELS.workspaceRefresh,
               ),
             )
           : null
@@ -1379,7 +1388,7 @@ window.__ModuleLoader__.load({
                   disabled: documentsBusy,
                   onClick: () => loadDocuments(true),
                 },
-                documentsBusy ? LABELS.running : LABELS.documentRefresh,
+                documentsBusy ? LABELS.workspaceBusy : LABELS.documentRefresh,
               ),
             )
           : null
@@ -1537,7 +1546,7 @@ window.__ModuleLoader__.load({
     return {
       inject: ['slots'],
       apply(ctx) {
-        beat('client-apply', 'v1.4.0')
+        beat('client-apply', 'v1.4.1')
         // Follow DeepSeek Harness on first run; an explicit choice overrides it.
         try {
           const locale = typeof ctx.get === 'function' ? ctx.get('locale') : null

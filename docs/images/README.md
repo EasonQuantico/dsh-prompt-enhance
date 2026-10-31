@@ -51,4 +51,7 @@ python3 generate-mockups.py
 - `depth.svg` 的数字来自 `strategies.js` 的 `DEPTH_SCALE`（0.34 / 0.64 / 1）与实测长度比例；
   改预算时先改代码常量，再跑 `generate-depth.py`，别只改图。
 - 图的批注编号（①②③…）要和两份 README 里对应小节的列表编号一致。
+- 1.4.0 起面板是「无边框 + elevation 投影」的浮层（见 `docs/web-styling.zh.md` 的高层级表面规则），
+  而四张 mockup 仍按旧的带边框样式绘制：它们说明布局与文案，不保证与真实边框/投影逐像素一致。
+  需要像素级一致时，跑测试台再用 `wb/pe-lang-ui.mjs`（headless Chrome + CDP）截图替换。
 - 这些图片不参与 npm 打包（`package.json` 的 `files` 未包含 `docs/images`），只服务 GitHub 上的阅读。

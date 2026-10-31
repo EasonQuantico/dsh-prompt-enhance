@@ -88,7 +88,7 @@ so every write must be guarded by loopback + same-origin + JSON content-type che
 ```json
 {
   "ok": true,
-  "version": "1.4.0",
+  "version": "1.4.1",
   "provider": "workbuddy2api-hub",
   "model": "deepseek-v4.1-flash",
   "modelSource": "session-default",
