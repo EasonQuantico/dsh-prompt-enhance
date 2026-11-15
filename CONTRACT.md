@@ -88,7 +88,7 @@ so every write must be guarded by loopback + same-origin + JSON content-type che
 ```json
 {
   "ok": true,
-  "version": "1.4.2",
+  "version": "1.5.0",
   "provider": "workbuddy2api-hub",
   "model": "deepseek-v4.1-flash",
   "modelSource": "session-default",
@@ -121,6 +121,11 @@ so every write must be guarded by loopback + same-origin + JSON content-type che
     { "id": "aishort", "label": "AiShort 提示词库", "hint": "…", "source": "…", "license": "MIT", "principles": ["…"] },
     { "id": "prompt-optimizer", "label": "Prompt Optimizer", "hint": "…", "source": "…", "license": "unknown", "principles": ["…"] }
   ],
+  "acts": [
+    { "id": "act-screenwriter", "zh": "编剧", "en": "Screenwriter", "applies": ["creative"] },
+    { "id": "act-security-auditor", "zh": "安全审计师", "en": "Cyber Security Specialist", "applies": ["code"] }
+  ],
+  "routes": ["methodology", "act", "structure"],
   "client": { "beats": 3, "recent": [{ "at": 1761, "event": "dock-mounted", "detail": "hooks-ok" }] }
 }
 ```
@@ -239,6 +244,47 @@ Validation error codes: `empty-prompt` (400), `prompt-too-long` (413), `bad-mode
 
 The host aborts the model call when the HTTP request closes.
 
+### `POST /prompt-enhance/api/candidates` — `text/event-stream`
+
+The automatic mode. The body only needs the draft:
+
+```json
+{
+  "prompt": "写一个雨夜咖啡馆的短片剧本",
+  "depth": "default",
+  "cwd": "C:\\optional\\absolute\\path",
+  "sessionId": "optional-session-id"
+}
+```
+
+The host first recognizes the intent with one small LLM call (max 400 tokens, 30 s
+deadline). The model is asked for `{"intent":"code|creative|doc","summary","keywords"}`;
+when the answer is not parseable JSON the host falls back to a keyword heuristic and
+labels the intent `source: "heuristic"`. It then plans three candidates and generates
+them sequentially, each as its own `/enhance`-style stream with a route-tagged system
+prompt:
+
+- slot 0 `methodology` — the top methodology from `selectMethodology` for the intent;
+- slot 1 `act` — one act role from `ACT_ROLES` (techniques distilled from f/prompts.chat's
+  act cards, CC BY-NC: only the technique, never card text) plus the secondary methodology;
+- slot 2 `structure` — the secondary methodology, i.e. the same recognized intent written
+  with a different structured house style.
+
+Events (same transport rules as `/enhance`, plus):
+
+| event | data |
+| --- | --- |
+| `meta` | `{ provider, model, modelSource, promptChars, depth, routes: ["methodology","act","structure"], stage: "intent", startedAt }` |
+| `status` | `{ stage: "intent", intent, summary, keywords, source: "model"|"heuristic" }`, `{ stage: "plan", intent, candidates: [{slot, route, label, reason}] }`, `{ stage: "generating", slot, route }`, reasoning/text per slot |
+| `delta` | `{ slot, text }` |
+| `slot-error` | `{ slot, code: "upstream-failed"|"empty-result", message }` — the remaining routes still run |
+| `slot-done` | `{ slot, chars, finish }` |
+| `done` | `{ intent, intentSummary, depth, slots: [{slot, route, label, labelEn, reason, text, finish}], durationMs }` |
+| `error` | `{ code, message }` — only when every route failed |
+
+Validation error codes: `empty-prompt` (400), `prompt-too-long` (413), `bad-depth` (400),
+`no-model` (503).
+
 ### `POST /prompt-enhance/api/cancel`
 
 Optional `{}` body; aborts the newest in-flight enhancement of that process. Not required
@@ -278,6 +324,11 @@ UI requirements:
    of width). Inside it:
 
    - 代码 / 创作 / 文档 tab switch.
+   - A top view switch `自动 | 高级` above them: the default `自动` view streams three
+     route-tagged candidates from `POST /candidates` (methodology / act / structure), each
+     card showing its route label, the reason and a `使用这组` + `复制` action; the `高级`
+     view is the full manual panel described below. The chosen view is remembered as `view`
+     in `dsh-prompt-enhance.prefs` (default `auto`).
    - Variant cards (radio behaviour) per the vocabulary above; the last choice per family is
      remembered in `localStorage` under `dsh-prompt-enhance.prefs` (panel choices only, never
      the draft text).

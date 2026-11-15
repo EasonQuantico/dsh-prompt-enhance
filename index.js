@@ -18,13 +18,19 @@ import {
   DEPTHS,
   DEPTH_IDS,
   buildSystemPrompt,
+  buildAutoPrompt,
   depthBudget,
   methodologyById,
   methodologyCatalogue,
   selectMethodology,
+  selectAct,
+  actById,
+  variantForIntent,
+  ACT_ROLES,
+  AUTO_ROUTES,
 } from './strategies.js'
 
-export const VERSION = '1.4.2'
+export const VERSION = '1.5.0'
 /** `llm` is required for the enhance route; `webServer` is injected locally below. */
 export const inject = ['llm']
 const ROUTE_PREFIX = '/prompt-enhance/api'
@@ -742,6 +748,7 @@ export function apply(ctx, rawConfig = {}) {
         return sendJson(response, 200, { ok: true })
       }
       if (request.method === 'POST' && path === '/enhance') return await handleEnhance(ctx, state, request, response)
+      if (request.method === 'POST' && path === '/candidates') return await handleCandidates(ctx, state, request, response)
       if (request.method === 'POST' && path === '/cancel') {
         let cancelled = 0
         for (const job of state.inflight) {
@@ -809,6 +816,8 @@ async function handleState(ctx, state, response) {
     focuses: FOCUSES,
     depths: DEPTHS,
     methodologies: methodologyCatalogue(),
+    acts: ACT_ROLES.map(({ id, zh, en, applies }) => ({ id, zh, en, applies })),
+    routes: AUTO_ROUTES,
     client: { beats: state.presence.length, recent: state.presence.slice(-6) },
   })
 }
@@ -1107,6 +1116,311 @@ async function handleEnhance(ctx, state, request, response) {
     finish: finish ? finish.kind : 'stop',
     durationMs: Date.now() - startedAt,
     truncated: finish ? finish.kind === 'max-tokens' : false,
+  })
+  closeStream()
+}
+
+/** Heuristic intent guess when the LLM intent call is unavailable or unparseable. */
+function heuristicIntent(prompt) {
+  const text = String(prompt || '').toLowerCase()
+  if (/[代码|函数|接口|脚本|命令|编译|报错|bug|部署|api|sql|前端|后端|正则|regex|开发|编程|python|javascript|typescript|java|golang|rust|css|html]/.test(text)) return 'code'
+  if (/[剧本|小说|故事|文案|台词|诗歌|广告|散文|角色|情节|视频脚本|大纲|营销|slogan|创意|写作|poem|story|novel|essay]/.test(text)) return 'creative'
+  if (/[文档|readme|说明|手册|纪要|摘要|总结|文档补|章节|报告|白皮书|文档draft|documentation|manual|report]/.test(text)) return 'doc'
+  return 'code'
+}
+
+/** Parse `{intent, summary, keywords}` from the intent-call text; null on failure. */
+function parseIntent(text) {
+  if (!text) return null
+  const match = /\{[\s\S]*\}/.exec(text)
+  if (!match) return null
+  try {
+    const parsed = JSON.parse(match[0])
+    if (parsed && ['code', 'creative', 'doc'].includes(parsed.intent)) {
+      return {
+        intent: parsed.intent,
+        summary: typeof parsed.summary === 'string' ? parsed.summary.slice(0, 200) : '',
+        keywords: Array.isArray(parsed.keywords) ? parsed.keywords.filter((item) => typeof item === 'string').slice(0, 8) : [],
+      }
+    }
+  } catch {
+    /* fall through */
+  }
+  return null
+}
+
+/**
+ * POST /candidates — the automatic mode: recognize the draft's intent, then
+ * stream three candidate rewrites (methodology / act / structure routes), each
+ * tagged with its source so the client can show provenance.
+ */
+async function handleCandidates(ctx, state, request, response) {
+  const config = state.config
+  const body = await readBody(request)
+
+  const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
+  if (!prompt) return sendError(response, 400, 'empty-prompt', '请先在对话框输入提示词')
+  if (prompt.length > config.maxPromptChars) {
+    return sendError(response, 413, 'prompt-too-long', `提示词过长（上限 ${config.maxPromptChars} 字符）`)
+  }
+
+  const depth = body.depth === undefined || body.depth === null || body.depth === '' ? 'default' : String(body.depth)
+  if (!DEPTH_IDS.includes(depth)) return sendError(response, 400, 'bad-depth', `depth 必须是 ${DEPTH_IDS.join('、')} 或省略`)
+
+  const route = await resolveRoute(ctx, config)
+  if (!route) return sendError(response, 503, 'no-model', '当前没有可用的模型路由，请先在设置中选择默认模型')
+
+  const job = { cancel: () => {}, closed: false }
+  state.inflight.add(job)
+  const emit = sseOpen(response)
+  const ping = setInterval(() => {
+    if (!response.writableEnded && !response.destroyed) response.write(': ping\n\n')
+  }, 10000)
+  if (typeof ping.unref === 'function') ping.unref()
+
+  const seen = { value: false }
+  const closeStream = () => {
+    if (seen.value) return
+    seen.value = true
+    clearInterval(ping)
+    state.inflight.delete(job)
+    if (!response.writableEnded && !response.destroyed) response.end()
+  }
+  request.on('close', () => {
+    job.closed = true
+    job.cancel()
+    closeStream()
+  })
+  job.cancel = () => {
+    job.closed = true
+  }
+
+  const startedAt = Date.now()
+
+  emit('meta', {
+    provider: route.provider,
+    model: route.model,
+    modelSource: route.source,
+    promptChars: prompt.length,
+    depth,
+    routes: AUTO_ROUTES.map((entry) => entry.id),
+    stage: 'intent',
+    startedAt,
+  })
+
+  /* --- step 1: intent recognition (one small LLM call) ------------------- */
+
+  const intentText = [
+    '你是需求识别器。阅读下面的用户提示词，判断它属于哪一类：',
+    '- code：写代码、改代码、调试、部署、架构等工程任务；',
+    '- creative：写故事、剧本、文案、营销、诗歌等创作任务；',
+    '- doc：写或补 README、说明书、报告、纪要等文档任务。',
+    '只输出一个 JSON 对象，不要输出其他文字：{"intent":"code|creative|doc","summary":"一句话概括需求","keywords":["关键词1","关键词2"]}',
+  ].join('\n')
+  const intentMessages = [
+    {
+      role: 'user',
+      content: [{ type: 'text', text: `<任务说明>\n${intentText}\n</任务说明>\n\n<用户提示词>\n${prompt}\n</用户提示词>` }],
+    },
+  ]
+
+  let recognized = null
+  let intentRaw = ''
+  let intentFailure = ''
+  const intentTimeout = setTimeout(() => {
+    job.closed = true
+    intentFailure = '意图识别超时'
+  }, 30000)
+  if (typeof intentTimeout.unref === 'function') intentTimeout.unref()
+
+  try {
+    const stream = ctx.llm.stream({ provider: route.provider, model: route.model, messages: intentMessages, maxTokens: 400 })
+    for await (const chunk of stream) {
+      if (job.closed) break
+      if (chunk.type === 'text-delta' && chunk.text) intentRaw += chunk.text
+      if (chunk.type === 'finish') {
+        if (chunk.reason && chunk.reason.kind === 'error') intentFailure = chunk.reason.failure?.message || '意图识别失败'
+      }
+    }
+  } catch (error) {
+    intentFailure = error?.message || String(error)
+  } finally {
+    clearTimeout(intentTimeout)
+  }
+
+  if (intentFailure && !job.closed) {
+    emit('error', { code: 'upstream-failed', message: intentFailure })
+    closeStream()
+    return
+  }
+
+  recognized = parseIntent(intentRaw) || { intent: heuristicIntent(prompt), summary: '', keywords: [] }
+  const intent = recognized.intent
+  emit('status', { stage: 'intent', intent, summary: recognized.summary, keywords: recognized.keywords, source: parseIntent(intentRaw) ? 'model' : 'heuristic' })
+
+  /* --- step 2: plan the three candidates --------------------------------- */
+
+  const modeForIntent = intent === 'creative' ? 'creative' : intent === 'doc' ? 'doc' : 'code'
+  const variant = variantForIntent(intent)
+  const choice = selectMethodology({ mode: modeForIntent, variant, prompt, requested: 'auto' })
+  const ranked = Array.isArray(choice.ranked) && choice.ranked.length ? choice.ranked : [choice.id, 'langgpt', 'prompt-optimizer', 'aishort'].filter((id) => methodologyById(id))
+  const primaryId = ranked[0]
+  const secondaryId = ranked[1] || ranked[0]
+  const act = selectAct({ intent, prompt })
+
+  const plan = [
+    {
+      slot: 0,
+      routeId: 'methodology',
+      methodology: methodologyById(primaryId),
+      act: null,
+      labelZh: methodologyById(primaryId) ? methodologyById(primaryId).label : primaryId,
+      labelEn: primaryId,
+      reason: choice.reason,
+    },
+    {
+      slot: 1,
+      routeId: 'act',
+      methodology: methodologyById(secondaryId),
+      act,
+      labelZh: act.zh,
+      labelEn: act.en,
+      reason: `识别为${intent === 'code' ? '代码' : intent === 'creative' ? '创作' : '文档'}类，${act.zh} 的手法与需求最贴合`,
+    },
+    {
+      slot: 2,
+      routeId: 'structure',
+      methodology: methodologyById(secondaryId),
+      act: null,
+      labelZh: methodologyById(secondaryId) ? methodologyById(secondaryId).label : secondaryId,
+      labelEn: secondaryId,
+      reason: `同一识别结果下换一种结构化手法（${methodologyById(secondaryId) ? methodologyById(secondaryId).label : secondaryId}）`,
+    },
+  ]
+
+  emit('status', {
+    stage: 'plan',
+    intent,
+    candidates: plan.map((entry) => ({ slot: entry.slot, route: entry.routeId, label: entry.labelZh, reason: entry.reason })),
+  })
+
+  /* --- step 3: generate each candidate sequentially ---------------------- */
+
+  const slots = plan.map((entry) => ({ slot: entry.slot, route: entry.routeId, label: entry.labelZh, labelEn: entry.labelEn, reason: entry.reason, text: '', finish: null }))
+  let anyFailure = ''
+
+  for (const entry of plan) {
+    if (job.closed) break
+    const systemText = buildAutoPrompt({
+      promptText: prompt,
+      intent,
+      route: entry.routeId,
+      methodology: entry.methodology,
+      act: entry.act,
+      depth,
+    })
+    const messages = [
+      {
+        role: 'user',
+        content: [{ type: 'text', text: `<增强指令>\n${systemText}\n</增强指令>\n\n<用户原提示词>\n${prompt}\n</用户原提示词>` }],
+      },
+    ]
+    emit('status', { stage: 'generating', slot: entry.slot, route: entry.routeId })
+
+    let text = ''
+    let finish = null
+    let failure = ''
+    let reasoningChars = 0
+    let lastStatusAt = 0
+    let announcedText = false
+    const slotTimeout = setTimeout(() => {
+      job.closed = true
+      failure = `生成超时（>${Math.round(config.requestTimeoutMs / 1000)}s）`
+    }, config.requestTimeoutMs)
+    if (typeof slotTimeout.unref === 'function') slotTimeout.unref()
+
+    try {
+      const stream = ctx.llm.stream({ provider: route.provider, model: route.model, messages, maxTokens: config.maxOutputTokens })
+      for await (const chunk of stream) {
+        if (job.closed) break
+        switch (chunk.type) {
+          case 'reasoning-delta': {
+            const piece = typeof chunk.text === 'string' ? chunk.text : ''
+            reasoningChars += piece.length
+            const now = Date.now()
+            if (now - lastStatusAt > 1200) {
+              lastStatusAt = now
+              emit('status', { stage: 'reasoning', slot: entry.slot, chars: reasoningChars })
+            }
+            break
+          }
+          case 'text-delta':
+            if (chunk.text) {
+              if (!announcedText) {
+                announcedText = true
+                emit('status', { stage: 'text', slot: entry.slot, chars: 0 })
+              }
+              text += chunk.text
+              emit('delta', { slot: entry.slot, text: chunk.text })
+            }
+            break
+          case 'finish':
+            finish = chunk.reason || finish
+            break
+          default:
+            break
+        }
+      }
+    } catch (error) {
+      failure = error?.message || String(error)
+    } finally {
+      clearTimeout(slotTimeout)
+    }
+
+    if (failure) {
+      anyFailure = failure
+      emit('slot-error', { slot: entry.slot, code: 'upstream-failed', message: failure })
+      continue
+    }
+    if (finish && finish.kind === 'error') {
+      anyFailure = finish.failure?.message || '模型调用失败'
+      emit('slot-error', { slot: entry.slot, code: 'upstream-failed', message: anyFailure })
+      continue
+    }
+
+    const tidy = tidyResult(text)
+    const record = slots.find((item) => item.slot === entry.slot)
+    if (!tidy) {
+      emit('slot-error', { slot: entry.slot, code: 'empty-result', message: '该路线没有返回内容' })
+      continue
+    }
+    record.text = tidy
+    record.finish = finish ? finish.kind : 'stop'
+    emit('slot-done', { slot: entry.slot, chars: tidy.length, finish: record.finish })
+  }
+
+  const completed = slots.filter((item) => item.text)
+  if (job.closed && !completed.length) {
+    closeStream()
+    return
+  }
+  if (!completed.length && anyFailure) {
+    emit('error', { code: 'upstream-failed', message: anyFailure })
+    closeStream()
+    return
+  }
+  if (!completed.length) {
+    emit('error', { code: 'empty-result', message: '三条路线都没有返回内容，请重试' })
+    closeStream()
+    return
+  }
+
+  emit('done', {
+    intent,
+    intentSummary: recognized.summary,
+    depth,
+    slots: completed,
+    durationMs: Date.now() - startedAt,
   })
   closeStream()
 }

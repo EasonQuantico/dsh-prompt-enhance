@@ -256,9 +256,13 @@ class Notes:
 # --------------------------------------------------------------------------
 
 
-def panel_head(draw, x, y, w):
+def panel_head(draw, x, y, w, subtitle="先选类型，再增强；结果会回填到输入框", chips=None):
     text(draw, x, y, "提示词增强", font("bold", 13), TEXT)
-    text(draw, x, y + s(19), "先选类型，再增强；结果会回填到输入框", font("ui", 11), TEXT3)
+    text(draw, x, y + s(19), subtitle, font("ui", 11), TEXT3)
+    if chips:
+        cursor = x
+        for label, active in chips:
+            cursor = panel_check(draw, cursor, y + s(4), label, active) + s(6)
     bx = x + w - s(22)
     rounded(draw, [bx, y - s(2), bx + s(22), y + s(20)], s(6), fill=PANEL_HI)
     text(draw, bx + s(11), y + s(9), "×", font("ui", 13), TEXT3, anchor="mm")
@@ -440,6 +444,157 @@ def render_composer(path):
 
 
 # --------------------------------------------------------------------------
+# illustration 1b: the auto view (default state with a draft in the composer)
+# --------------------------------------------------------------------------
+
+AUTO_CARDS = (
+    (
+        "方法论路线 · LangGPT 结构化提示词",
+        "创作场景下 LangGPT 的结构化手法最贴合（自动选择）",
+        ("【角色】深夜咖啡馆的驻唱歌手……", "【背景】雨夜，霓虹在积水里晕开……", "【节奏】三个场景，情绪先抑后扬……"),
+    ),
+    (
+        "角色路线 · 编剧",
+        "识别为创作类，编剧 的手法与需求最贴合",
+        ("一句话故事线：……", "场景卡：场号｜时间｜地点｜冲突……", "台词风格：短句、留白……"),
+    ),
+    (
+        "结构路线 · Prompt Optimizer",
+        "同一识别结果下换一种结构化手法（Prompt Optimizer）",
+        ("## 角色", "## 场景", "## 交付"),
+    ),
+)
+
+
+def auto_card_metrics(preview):
+    """Shared card geometry so layout and drawing can never drift apart."""
+    line_h = s(13)
+    preview_h = s(4) + line_h * len(preview) + s(4)
+    title_row, hint_row, gap1, gap2 = s(15), s(13), s(2), s(3)
+    pad_top, pad_bottom = s(6), s(6)
+    buttons_h = s(21)
+    inner_gap = s(4)
+    height = pad_top + title_row + gap1 + hint_row + gap2 + preview_h + inner_gap + buttons_h + pad_bottom
+    return {
+        "height": height,
+        "title_dy": pad_top,
+        "hint_dy": pad_top + title_row + gap1,
+        "preview_dy": pad_top + title_row + gap1 + hint_row + gap2,
+        "preview_h": preview_h,
+        "line_h": line_h,
+        "buttons_dy": pad_top + title_row + gap1 + hint_row + gap2 + preview_h + inner_gap,
+        "buttons_h": buttons_h,
+    }
+
+
+def auto_card(draw, x, y, w, title, hint, preview):
+    """One candidate card: route title, reason, mono preview, use/copy buttons."""
+    m = auto_card_metrics(preview)
+    rounded(
+        draw,
+        [x, y, x + w, y + m["height"]],
+        s(10),
+        fill=(35, 38, 44),
+        outline=BORDER_SOFT,
+        width=s(1),
+    )
+    text(draw, x + s(14), y + m["title_dy"], title, font("bold", 12), TEXT)
+    text(draw, x + s(14), y + m["hint_dy"], hint, font("ui", 10.5), TEXT3)
+    px, py = x + s(14), y + m["preview_dy"]
+    rounded(
+        draw,
+        [px, py, x + w - s(14), py + m["preview_h"]],
+        s(8),
+        fill=FIELD,
+        outline=BORDER_SOFT,
+        width=s(1),
+    )
+    for i, line in enumerate(preview):
+        mixed(draw, px + s(10), py + s(4) + m["line_h"] * i, line, 9.5, (196, 202, 211))
+    by = y + m["buttons_dy"]
+    button(draw, x + s(14), by, "使用这组", primary=True, height=21)
+    button(draw, x + s(94), by, "复制", height=21)
+    return y + m["height"]
+
+
+def render_auto(path):
+    css_w = 1500
+    pad = s(20)
+    panel = [s(52), s(36), s(1096), 0]
+    inner_w = (panel[2] - pad) - (panel[0] + pad)
+    edge_x = panel[2]
+
+    probe = ImageDraw.Draw(Image.new("RGBA", (10, 10)))
+    hint_lines = wrap_mixed(
+        probe,
+        "自动识别草稿的需求类型，从方法论与提示词库各路生成 3 组候选，选一组回填输入框。",
+        11,
+        inner_w,
+    )
+
+    y = s(56)
+    y += s(34) + s(8)  # head
+    view_y = y  # 自动 | 高级 view switch
+    y += s(32) + s(4)
+    hint_y = y
+    y += s(17) * len(hint_lines) + s(2)
+    actions_y = y
+    y += s(28) + s(4)
+    meta_y = y
+    y += s(18) + s(2)
+    label_y = y
+    y += s(16) + s(2)
+    cards_y = y
+    card_gap = s(10)
+    for card in AUTO_CARDS:
+        y += auto_card_metrics(card[2])["height"] + card_gap
+    depth_y = y - card_gap + s(6)
+    y = depth_y + s(26)
+    bottom = y + s(7)
+    panel[3] = bottom
+
+    notes = Notes(edge_x, s(1172), s(300))
+    notes.add(view_y + s(16), "自动 | 高级", "自动是默认视图，高级是原来的完整面板")
+    notes.add(meta_y + s(6), "需求识别", "类型 + 一句话摘要；模型答不上时回落关键词，界面会标来源")
+    notes.add(cards_y + s(14), "三条候选路线", "各标出处：方法论 / 角色 / 结构")
+    notes.add(cards_y + s(100), "使用这组 / 复制", "使用这组回填输入框；复制进剪贴板；三条互不影响")
+    notes.add(depth_y + s(8), "档位在自动视图同样生效", "三组候选共用同一预算")
+    notes.place(s(60))
+
+    img = Image.new("RGBA", (s(css_w), max(bottom, notes.bottom()) + s(34)), BG + (255,))
+    draw = surface(img, panel, s(14))
+    x0, y0 = panel[0], panel[1]
+    inner_x = x0 + pad
+
+    panel_head(
+        draw,
+        inner_x,
+        y0 + s(20),
+        inner_w,
+        subtitle="先识别类型，再给三组候选；结果会回填到输入框",
+        chips=(("中文", True), ("English", False)),
+    )
+    panel_tabs(draw, inner_x, view_y, inner_w, labels=("自动", "高级"), active=0)
+    for i, line in enumerate(hint_lines):
+        text(draw, inner_x, hint_y + s(17) * i, line, font("ui", 11), TEXT3)
+    x_cursor = button(draw, inner_x, actions_y, "开始自动优化", primary=True)
+    text(draw, x_cursor + s(2), actions_y + s(14), "增强后会给出可直接使用的完整提示词。", font("ui", 11), TEXT3, anchor="lm")
+    mixed(draw, inner_x, meta_y, "需求识别：创作 · 雨夜咖啡馆短片剧本 · 12.4s", 11, TEXT3)
+    text(draw, inner_x, label_y, "候选结果", font("ui", 11), TEXT3)
+    text(draw, inner_x + s(56), label_y, "每组候选都标注来源：方法论 / 角色 / 结构路线。", font("ui", 11), TEXT3)
+    card_y = cards_y
+    for title, hint, preview in AUTO_CARDS:
+        card_y = auto_card(draw, inner_x, card_y, inner_w, title, hint, preview) + card_gap
+
+    panel_depth(draw, inner_x, depth_y, inner_x + s(258))
+
+    notes.draw(draw)
+
+    img.convert("RGB").save(path, optimize=True)
+    return img.size
+
+
+# --------------------------------------------------------------------------
 # illustration 2: the idle panel
 # --------------------------------------------------------------------------
 
@@ -453,6 +608,8 @@ def render_panel(path):
 
     y = s(56)
     y += s(34) + s(14)  # head
+    view_y = y  # 自动 | 高级 view switch above the type tabs
+    y += s(32) + s(10)
     tabs_y = y
     y += s(32) + s(12)
     cards_y = y
@@ -489,6 +646,18 @@ def render_panel(path):
         order=1,
         elbow=12,
     )
+    # The view switch sits at the top of the panel but is annotated last (⑧):
+    # order=2 keeps the badge at the bottom of the column; elbow=30 gives the
+    # long vertical leader its own trunk — past the other notes' elbows (2244)
+    # but short of the badge column (discs start at 2262), so it never slices
+    # through the badges above it.
+    notes.add(
+        view_y + s(16),
+        "自动 | 高级",
+        "默认停在自动；高级里自己定方式、方向与档位",
+        order=2,
+        elbow=30,
+    )
     notes.place(s(60))
 
     img = Image.new("RGBA", (s(css_w), max(bottom, notes.bottom()) + s(34)), BG + (255,))
@@ -497,6 +666,7 @@ def render_panel(path):
     inner_x = x0 + pad
 
     panel_head(draw, inner_x, y0 + s(20), inner_w)
+    panel_tabs(draw, inner_x, view_y, inner_w, labels=("自动", "高级"), active=1)
     panel_tabs(draw, inner_x, tabs_y, inner_w)
     panel_card(
         draw,
@@ -789,6 +959,7 @@ def main():
     here = os.path.dirname(os.path.abspath(__file__))
     for name, render in (
         ("ui-composer.png", render_composer),
+        ("ui-auto.png", render_auto),
         ("ui-panel.png", render_panel),
         ("ui-panel-doc.png", render_panel_doc),
         ("ui-result.png", render_result),

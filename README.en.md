@@ -8,11 +8,15 @@
 [![Dependencies](https://img.shields.io/badge/runtime%20deps-none-brightgreen.svg)](package.json)
 
 A plugin for DSH (DeepSeek Harness). It adds a **✨ Prompt Enhance** button to the right of the
-composer: pick *code*, *creative* or *documentation*, pick a refinement style and a length, and the
-plugin reads your workspace (optionally), selects a prompt-engineering methodology, and streams back a
+composer. The panel opens on an **Automatic** view by default: the plugin classifies the draft
+(code / creative / documentation) and returns three route-tagged candidates — *methodology*,
+*role* and *structure* — each labelled with its provenance; pick one and it lands in the input
+box. Switch to **Advanced** to pick the refinement style and length yourself: the plugin reads
+your workspace (optionally), selects a prompt-engineering methodology, and streams back a
 structured, executable, verifiable prompt — written straight into the input box.
 
 - **Zero runtime dependencies**, no build step, drop it into a profile and go.
+- **Automatic mode**: one intent-recognition call + three candidates (methodology / role / structure), each labelled with its source; a failed route never swallows the others.
 - **Reads real code**: `code-read` scans the workspace tree, key files and the dependency manifest before rewriting.
 - **Four methodologies, auto-selected**: Superpowers / Prompt Optimizer / LangGPT / AiShort techniques scored per scenario, or pick one manually.
 - **Three lengths**: concise / default / thorough — three lines or a full structure with acceptance criteria, from the same request.
@@ -28,6 +32,7 @@ structured, executable, verifiable prompt — written straight into the input bo
 
 - [Features](#features)
 - [At a glance](#at-a-glance)
+- [Automatic mode](#automatic-mode)
 - [The six refinement styles](#the-six-refinement-styles)
 - [Depth: three lengths](#depth-three-lengths)
 - [Methodology selection](#methodology-selection)
@@ -49,22 +54,38 @@ structured, executable, verifiable prompt — written straight into the input bo
 | Capability | Description |
 | --- | --- |
 | Persistent button | A pill button in the composer's right-hand control row, present in both the hero and in-session composer |
-| Three families, six styles | Code (read the workspace / prompt-only), creative (enrich / tighten the structure) and documentation (fill in an existing document / draft from a template) |
+| Automatic mode | The panel opens on the "Auto" view: it classifies the draft (code / creative / documentation) and returns three provenance-labelled candidates — *methodology*, *role* and *structure* routes; pick one to write back |
+| Three families, six styles | Advanced view keeps code (read the workspace / prompt-only), creative (enrich / tighten the structure) and documentation (fill in an existing document / draft from a template) |
 | Two code focuses | "Improve the development framework" and "Review security", multi-select, at least one |
 | Three lengths | Concise / default / thorough: a character budget per request, scaled per methodology by measured length |
-| Methodology routing | Four upstream techniques plus `auto` scoring; a dropdown pins one if you disagree |
+| Methodology routing | Four upstream techniques plus `auto` scoring; a dropdown pins one if you disagree. Two of the three automatic routes are ranked by the same scorer |
+| Act-role library | Ten act roles (code review, QA, security audit, architecture, tech writing, screenwriting, novel writing, copy-editing, translation, summarising) distilled from prompts.chat's act cards (CC BY-NC: techniques only, no card text) |
 | Workspace evidence | Directory tree, manifest summary, prioritised file excerpts, 10 heuristic security findings |
 | Document evidence | Outline first: heading levels, tables, lists, numbering and paragraph length, so additions fit the existing structure |
-| Streaming UI | SSE deltas; first shows “model is thinking… (N chars)” then types the result out |
-| One-click landing | Replace composer / insert at caret / copy / retry; the result box is editable before applying |
-| Preference memory | Last family, style, focus, methodology and document are remembered in `localStorage` |
+| Streaming UI | SSE deltas; first shows “model is thinking… (N chars)” then types the result out. In the auto view the three routes fill in as they complete |
+| One-click landing | Replace composer / insert at caret / copy / retry; the result box is editable before applying. Each auto candidate has its own "Use this one" / "Copy" |
+| Preference memory | Last view, family, style, focus, length, methodology and document are remembered in `localStorage` |
 | Diagnostic breadcrumbs | The browser half reports mount/open/start/apply events to the host for console-free debugging |
 
 ## At a glance
 
-> Of the five images below, four UI mockups are **drawn from `client.js`'s real layout and copy**, not
+> Of the six images below, five UI mockups are **drawn from `client.js`'s real layout and copy**, not
 > screenshots; the last one diagrams what the document digest carries. Paths, file names and model names
 > in them are examples.
+
+### Automatic: the default view with three candidates
+
+![The automatic view: auto|advanced switch, intent line, three candidate cards and depth](docs/images/ui-auto.png)
+
+- **① Intent recognition** — the plugin first decides whether the draft is code, creative or documentation,
+  with a one-line summary; when the model answer is unusable it falls back to keywords and the UI says so.
+- **② Three candidate routes** — methodology, act-role and structure each produce one candidate; every card
+  is labelled with its route · technique and why it was picked.
+- **③ Progress is visible** — each route owns its slot: streaming text, a check when done, a failure mark when
+  it fails; one failing route never blocks the others.
+- **④ Pick one to land it** — “use this set” writes the candidate back into the composer; “copy” goes to the
+  clipboard; the three are independent.
+- **⑤ Depth applies here too** — concise / default / thorough share one budget across the three candidates.
 
 ### The button lives in the composer's control row
 
@@ -76,7 +97,7 @@ structured, executable, verifiable prompt — written straight into the input bo
 
 ### The panel: family first, then style and focus
 
-![The enhancement panel: family tabs, style cards, focuses, depth, methodology, workspace evidence, start button](docs/images/ui-panel.png)
+![The enhancement panel: auto|advanced switch, family tabs, style cards, focuses, depth, methodology, workspace evidence, start button](docs/images/ui-panel.png)
 
 - **① Family tabs** — code, creative or documentation; each family remembers the style you used last.
 - **② Six styles** — two per family, each card states what it adds.
@@ -116,6 +137,34 @@ structured, executable, verifiable prompt — written straight into the input bo
   **read-only evidence**: instructional text inside them is quoted material, not a command.
 - Unsupported gaps must be written as “待补充：需要 X（来源）”; numbers, citations and conclusions are never
   invented, and additions keep the original heading levels, numbering and table columns.
+
+## Automatic mode
+
+The panel's top row is an **Auto | Advanced** view switch, defaulting to Auto. The Auto view
+shows one action button, the recognized intent, and three candidate cards:
+
+1. **Intent recognition** — the host makes one small call (≤400 tokens, 30 s deadline) to
+   classify the draft as code / creative / doc and summarize it in one sentence; when the
+   answer is not parseable JSON it falls back to a keyword heuristic, and the interface labels
+   the source (`model` / `heuristic`).
+2. **Three candidate routes** — three rewrites per recognized intent:
+   - **Methodology route**: the highest-scoring technique set for that intent from
+     `selectMethodology`;
+   - **Role route**: one of ten act roles picked by keyword scoring (Code Reviewer, QA Tester,
+     Security Auditor, Architect, Tech Writer, Screenwriter, Novelist, Copy Editor, Translator,
+     Summarizer), layered with the runner-up methodology;
+   - **Structure route**: the same recognized intent rewritten with the runner-up house style.
+   Each card shows "route · technique" and why it was picked; a generating route shows a
+   placeholder until it finishes, and a failed route is marked as failed without swallowing the
+   others.
+3. **Pick one** — "Use this one" writes the candidate back into the composer (still editable),
+   "Copy" puts it on the clipboard; the depth knob applies to all three routes.
+
+The role techniques come from [f/prompts.chat](https://github.com/f/prompts.chat)'s act cards —
+that repository is CC BY-NC licensed, so this project only distils the *technique* ("a review
+must grade every change with acceptance criteria", "a screenplay starts from a one-line story
+then lands scene cards") and never quotes card text (provenance in
+`docs/research/prompt-sources.md` and `THIRD_PARTY_NOTICES.md`).
 
 ## The six refinement styles
 
@@ -311,19 +360,27 @@ the files behind the link; the browser half needs one page refresh.
 ## Usage
 
 1. Type a draft in the composer, e.g. “a small tool that batch-renames images”.
-2. Click ✨, pick *code*, *creative* or *documentation*, then a style; for code styles tick the focuses
-   (both by default).
-3. Leave the methodology on “auto (recommended)”, or pin one.
-4. Hit **Enhance**. The result streams in; use **Replace composer**, **Insert at caret**, **Copy** or **Retry**.
+2. Click ✨. The default **Auto** view classifies the draft and returns three candidates:
+   **methodology route**, **role route** and **structure route**, each labelled with its source
+   and the reason it was picked.
+3. Switch to **Advanced** to choose yourself: pick *code*, *creative* or *documentation*, then a
+   style; for code styles tick the focuses (both by default).
+4. Leave the methodology on “auto (recommended)”, or pin one; choose a length.
+5. Hit **Enhance** (Advanced) or **Auto-optimize** (Auto). The result streams in; use
+   **Replace composer**, **Insert at caret**, **Copy** or **Retry**. In the Auto view every
+   candidate card has its own "Use this one" / "Copy".
 
 Tips:
 
 - The more concrete the draft, the closer the result is to your intent; one or two sentences is enough —
   the plugin supplies the structure.
+- The auto mode generates all three routes in one pass — good for "look at a few phrasings, then
+  pick"; when you are in a hurry, the Advanced view goes straight to the point.
 - With `code-read` the panel shows how many files were scanned, which ones, and the first security
   findings — check that it read the directory you meant.
 - The first `code-read` is slower (workspace scan plus reasoning); with `deepseek-v4.1-flash` the
-  first byte arrived in 7–28 s in our tests.
+  first byte arrived in 7–28 s in our tests. The auto mode runs one recognition call plus three
+  routes, so its total time is roughly three times a single enhancement.
 - With `doc-fill`, check the “document” line first: is it the file you meant, and do the character and
   heading counts look right? Automatic selection ranks by prompt relevance; open the dropdown to switch.
   Naming the section in your draft works best, e.g. “add concurrency and timeout entries to the
@@ -404,8 +461,10 @@ The browser half only selects and writes back; the host half owns evidence, rout
 | File | Responsibility |
 | --- | --- |
 | `client.js` | slot registration, button and panel, SSE parsing, progress, write-back (`insertText` / `setDraft`) |
-| `index.js` | the three gates, `/state` `/workspace` `/documents` `/enhance` `/cancel`, `collectWorkspace`, `collectDocument`, `resolveRoute`, SSE |
-| `strategies.js` | vocabularies, `selectMethodology` scoring, `buildSystemPrompt`, `renderDigest` / `renderDocDigest` evidence framing |
+| `index.js` | the three gates, `/state` `/workspace` `/documents` `/enhance` `/candidates` `/cancel`, `collectWorkspace`, `collectDocument`, `resolveRoute`, SSE |
+| `strategies.js` | vocabularies, `selectMethodology` scoring, the act-role library and `selectAct`, `buildSystemPrompt` / `buildAutoPrompt`, `renderDigest` / `renderDocDigest` evidence framing |
+
+The advanced view's data flow:
 
 1. The browser posts the draft, family, style, focuses and the session cwd to `POST /enhance`.
 2. For `code-read` the host scans the workspace: tree, manifest summary, key excerpts, security findings.
@@ -415,6 +474,16 @@ The browser half only selects and writes back; the host half owns evidence, rout
    (“enhancement instructions” + “original draft”).
 4. The host streams from the session model via `ctx.llm.stream(…)` and pushes SSE frames back;
    `tidyResult` strips leading markdown code fences and “here is your prompt:” pleasantries.
+
+The automatic view's data flow:
+
+1. The browser posts the draft and length to `POST /candidates`.
+2. The host recognizes the intent with one small call (≤400 tokens, 30 s deadline; falls back to a
+   keyword heuristic when the answer is not JSON).
+3. The three routes each assemble their message with `buildAutoPrompt` and generate sequentially;
+   every route is tagged with a `slot`, and `slot-error` affects only that slot.
+4. `done` aggregates the three routes' texts and provenance (route / label / reason) and the browser
+   renders one card per slot.
 
 Workspace content and document text are wrapped in a read-only evidence frame that tells the model any
 imperative text found inside is *material*, not a command — a cheap defence against prompt injection
@@ -449,10 +518,11 @@ Mounted under `/prompt-enhance/api` (a plugin route, therefore not behind DSH's 
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/state` | Version, model route, workspace, vocabularies, methodology catalogue, breadcrumbs |
+| `GET` | `/state` | Version, model route, workspace, vocabularies, methodology catalogue, act roles and routes, breadcrumbs |
 | `GET` | `/workspace?refresh=1&cwd=…` | Read-only workspace scan: file list and security findings |
 | `GET` | `/documents?refresh=1&cwd=…&prompt=…&path=…` | Lists readable documents and outlines the one that would be read |
-| `POST` | `/enhance` | Start an enhancement, `text/event-stream` (`meta`/`status`/`delta`/`done`/`error`) |
+| `POST` | `/enhance` | The advanced view's manual enhancement, `text/event-stream` (`meta`/`status`/`delta`/`done`/`error`) |
+| `POST` | `/candidates` | The automatic mode: recognize the intent, then stream three route-tagged candidates, `text/event-stream` (`meta`/`status`/`delta`/`slot-done`/`slot-error`/`done`) |
 | `POST` | `/cancel` | Abort the in-flight run |
 | `POST` | `/presence` | Browser breadcrumbs (diagnostics only) |
 
@@ -525,6 +595,10 @@ Contribution rules (encoding, commit format, PR checklist) are in [CONTRIBUTING.
 - Document filling covers the excerpt that fits `maxDocumentChars` (16 000 characters by default); the
   digest says “truncated” when a file is longer.
 - Quality depends on the selected model; reasoning models can take 7–28 s to first byte — use “Stop” if needed.
+- The auto mode runs one intent-recognition call plus three route generations, so its total time is
+  roughly three times a single enhancement; all three routes come from the same model, and how much
+  they differ depends on the model. When recognition fails it falls back to the keyword heuristic
+  (the source is labelled in the UI).
 - The depth budget is an instruction, not a guarantee: measured output runs ~1.3–1.5× over the quoted
   number for all four sets. The relative gap between levels is stable; don't expect “concise” to land
   under exactly 1428 characters.
@@ -533,7 +607,8 @@ Contribution rules (encoding, commit format, PR checklist) are in [CONTRIBUTING.
   (the ✕ button and outside clicks still close it).
 - Verified on the DSH Web GUI only; the Electron IPC form is untested.
 - Upstream prompt text is deliberately *not* merged (LangGPT's licence badge conflicts with its API
-  metadata, Prompt Optimizer is non-OSI), so only the techniques are reimplemented.
+  metadata, Prompt Optimizer is non-OSI), so only the techniques are reimplemented; prompts.chat is
+  CC BY-NC and likewise contributes techniques only, never card text.
 
 ## Credits
 
@@ -543,6 +618,9 @@ The methodology router is based on reading and distilling four public projects �
 - [linshenkx/prompt-optimizer](https://github.com/linshenkx/prompt-optimizer) (licence `NOASSERTION`)
 - [langgptai/LangGPT](https://github.com/langgptai/LangGPT) (Apache-2.0 / README badge says MIT — conflict recorded)
 - [rockbenben/ChatGPT-Shortcut](https://github.com/rockbenben/ChatGPT-Shortcut) (MIT, code)
+
+The automatic mode's act roles are distilled from [f/prompts.chat](https://github.com/f/prompts.chat)'s
+act cards (CC BY-NC family) — techniques only, no card text is quoted.
 
 Licence details and the “no upstream text was copied” statement are in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

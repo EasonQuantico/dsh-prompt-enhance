@@ -13,6 +13,39 @@ All notable changes to this project are documented here. The format follows
   copy is replaced by a junction (or re-installed). Also documents that the Web GUI port changes
   between launches.
 
+## [1.5.0] — 2026-11-15
+
+The automatic mode: leave the panels to the plugin. The panel now opens on a `自动 | 高级`
+view switch; the default `自动` view classifies the draft and returns three route-tagged
+candidates to choose from, while `高级` is the familiar manual panel (code/creative/doc,
+focus, depth, methodology).
+
+### Added
+
+- `POST /candidates` (SSE): one small LLM call recognizes the draft's intent
+  (`{"intent":"code|creative|doc","summary","keywords"}`), with a keyword-heuristic fallback
+  labelled `source: "heuristic"`. The host then plans three candidates — the top methodology
+  for that intent (`methodology`), one act role (`act`), and a second house style applied to
+  the same intent (`structure`) — and streams them as `delta`/`slot-done`/`slot-error`
+  events tagged with `slot`; `done` aggregates `{ intent, intentSummary, depth, slots }`.
+- `ACT_ROLES` in `strategies.js`: ten bilingual act roles (Code Reviewer, QA Tester, Security
+  Auditor, Architect, Tech Writer, Screenwriter, Novelist, Copy Editor, Translator, Summarizer)
+  whose *techniques* are distilled from the act cards in f/prompts.chat (CC BY-NC — only the
+  technique, never the card text; provenance in `docs/research/prompt-sources.md`), each with
+  keyword scoring, an intent affinity and one-line Chinese brief.
+- `selectMethodology` now also returns a `ranked` list so the structure route can reuse the
+  runner-up house style.
+- `buildAutoPrompt`, `selectAct`, `variantForIntent` and `AUTO_ROUTES` exports.
+- `/state` exposes the catalogue for the new surfaces: `acts` (id/zh/en/applies) and `routes`.
+- Client: `自动 | 高级` view switch above the type tabs (remembered as `view` in
+  `dsh-prompt-enhance.prefs`, default `auto`); the auto view shows the recognized intent, three
+  candidate cards with provenance labels (`方法论路线` / `角色路线` / `结构路线` + the route's
+  house style or act role), a `使用这组` write-back and a `复制` action per candidate; a failed
+  route shows `该路线生成失败` instead of vanishing while the others complete.
+- `strategies.js` gained the automatic mode helpers behind unit tests, and the host suite
+  covers the whole `/candidates` pipeline (intent probe, plan, per-slot completion and the
+  one-route-fails-others-survive contract). Suite is now 73 tests.
+
 ## [1.4.2] — 2026-11-15
 
 The panel used to be clipped by the page's own overlay while the composer was on screen. It now lives

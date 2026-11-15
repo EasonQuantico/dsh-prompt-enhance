@@ -18,11 +18,23 @@ and is **not** loaded at runtime — `strategies.js` is the executed copy.
 | `langgpt` | [langgptai/LangGPT](https://github.com/langgptai/LangGPT) | Apache-2.0 per GitHub API; the repository README badge says MIT — **conflict, unresolved upstream** | Six-module skeleton (Role / Profile / Skills / Rules / Workflow / Output), "describe the person, not the method", de-AI-flavour checklist |
 | `aishort` | [rockbenben/ChatGPT-Shortcut](https://github.com/rockbenben/ChatGPT-Shortcut) | MIT (code), community-contributed cards | `act-as` role framing, single deliverable, negative constraints, explicit placeholders |
 
+The **automatic mode's act roles** (`ACT_ROLES` in `strategies.js`) add a fifth source:
+
+| Feature | Upstream project | Licence as observed | What was distilled |
+| --- | --- | --- | --- |
+| Ten act roles (Code Reviewer, QA Tester, Security Auditor, Architect, Tech Writer, Screenwriter, Novelist, Copy Editor, Translator, Summarizer) | [f/prompts.chat](https://github.com/f/prompts.chat) | `NOASSERTION` on GitHub — the cards carry per-author CC BY-NC terms | Only the *technique* each card demands (e.g. "a review must grade every change with acceptance criteria", "a screenplay starts from a one-line story then lands scene cards"); every role brief is our own Chinese wording, no card text is quoted |
+
 ## Notes on licence compatibility
 
 - This repository is MIT. Techniques and ideas are not copyrightable; no upstream code
   or prompt text is included, so the stricter upstream terms (Apache-2.0, or the
   `NOASSERTION` state of `prompt-optimizer`) do not relicense this work.
+- prompts.chat's cards are CC BY-NC: even technique paraphrases stay on the safe side only
+  when no expression is copied. `ACT_ROLES` therefore contains no card text, no card
+  titles-as-phrases, and no translations of card bodies — the role names match the acts
+  only to make the provenance traceable, and the research notes record which cards were
+  read. If you redistribute this plugin into a commercial product, re-check that usage
+  against the upstream licences yourself.
 - Attribution is kept in the source header of `strategies.js`, in the plugin UI
   (methodology tooltip shows source and licence), and in this file.
 - The LangGPT discrepancy is recorded rather than resolved: the GitHub API licence

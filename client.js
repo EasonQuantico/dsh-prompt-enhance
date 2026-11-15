@@ -104,6 +104,29 @@ window.__ModuleLoader__.load({
         docOption: (path, chars) => `${path}（${chars} 字）`,
         budgetSuffix: (n) => ` · ≤${n} 字`,
         reasoningSuffix: (n) => `（${n} 字）`,
+        viewLabel: '模式',
+        tabAuto: '自动',
+        tabAdvanced: '高级',
+        autoHint: '自动识别草稿的需求类型，从方法论与提示词库各路生成 3 组候选，选一组回填输入框。',
+        autoStart: '开始自动优化',
+        autoRunning: '自动优化中…',
+        autoIntent: '需求识别',
+        autoPlan: '生成计划',
+        autoCandidates: '候选结果',
+        autoUse: '使用这组',
+        autoCopy: '复制',
+        autoUsed: '已回填输入框',
+        autoPickHint: '每组候选标注了参考来源（方法论或提示词库角色）。',
+        intentCode: '代码类',
+        intentCreative: '创作类',
+        intentDoc: '文档类',
+        routeMethodology: '方法论路线',
+        routeAct: '角色路线',
+        routeStructure: '结构路线',
+        slotWaiting: '等待生成…',
+        slotFailed: '该路线生成失败',
+        intentOf: (intent) => (intent === 'code' ? '识别为代码类' : intent === 'creative' ? '识别为创作类' : '识别为文档类'),
+        autoFailed: '自动优化失败',
       },
       en: {
         trigger: 'Enhance prompt',
@@ -177,6 +200,29 @@ window.__ModuleLoader__.load({
         docOption: (path, chars) => `${path} (${chars} chars)`,
         budgetSuffix: (n) => ` · ≤${n} chars`,
         reasoningSuffix: (n) => ` (${n} chars)`,
+        viewLabel: 'Mode',
+        tabAuto: 'Auto',
+        tabAdvanced: 'Advanced',
+        autoHint: 'The draft is classified automatically, then three candidates are generated from the technique sets and the prompt library. Pick one to write back.',
+        autoStart: 'Auto-optimize',
+        autoRunning: 'Auto-optimizing…',
+        autoIntent: 'Intent',
+        autoPlan: 'Plan',
+        autoCandidates: 'Candidates',
+        autoUse: 'Use this one',
+        autoCopy: 'Copy',
+        autoUsed: 'Written back to the composer',
+        autoPickHint: 'Each candidate is tagged with its source (a technique set or a library role).',
+        intentCode: 'code',
+        intentCreative: 'creative',
+        intentDoc: 'document',
+        routeMethodology: 'Technique route',
+        routeAct: 'Role route',
+        routeStructure: 'Structure route',
+        slotWaiting: 'Waiting to run…',
+        slotFailed: 'This route failed',
+        intentOf: (intent) => (intent === 'code' ? 'Read as code' : intent === 'creative' ? 'Read as creative' : 'Read as a document'),
+        autoFailed: 'Auto optimization failed',
       },
     }
 
@@ -196,6 +242,7 @@ window.__ModuleLoader__.load({
     const MODE_CHOICES = ['code', 'creative', 'doc']
     const DEPTH_CHOICES = ['concise', 'default', 'thorough']
     const DEFAULT_DEPTH = 'default'
+    const VIEW_CHOICES = ['auto', 'advanced']
     const PREFS_KEY = 'dsh-prompt-enhance.prefs'
 
     /**
@@ -293,6 +340,11 @@ window.__ModuleLoader__.load({
         aishort: { label: { zh: 'AiShort 提示词库', en: 'AiShort prompt library' } },
         'prompt-optimizer': { label: { zh: 'Prompt Optimizer', en: 'Prompt Optimizer' } },
       },
+      route: {
+        methodology: { label: { zh: '方法论路线', en: 'Technique route' } },
+        act: { label: { zh: '角色路线', en: 'Role route' } },
+        structure: { label: { zh: '结构路线', en: 'Structure route' } },
+      },
     }
 
     /** One word from the vocabulary, in the language being shown right now. */
@@ -357,6 +409,11 @@ window.__ModuleLoader__.load({
       return LANGUAGES.includes(saved) ? saved : defaultLanguage
     }
 
+    function pickView(prefs) {
+      const saved = prefs && typeof prefs.view === 'string' ? prefs.view : ''
+      return VIEW_CHOICES.includes(saved) ? saved : 'auto'
+    }
+
     /** Keep the tail of a workspace path so the note stays one line. */
     function shortPath(path) {
       const text = String(path || '')
@@ -408,8 +465,8 @@ window.__ModuleLoader__.load({
     }
 
     /** POST a JSON body and consume the host's SSE response. */
-    async function streamEnhance(body, handlers, signal) {
-      const response = await fetch(apiPath('/enhance'), {
+    async function streamSse(path, body, handlers, signal) {
+      const response = await fetch(apiPath(path), {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'content-type': 'application/json' },
@@ -452,11 +509,8 @@ window.__ModuleLoader__.load({
         }
         const name = eventName
         eventName = 'message'
-        if (name === 'meta' && handlers.onMeta) handlers.onMeta(payload)
-        else if (name === 'status' && handlers.onStatus) handlers.onStatus(payload)
-        else if (name === 'delta' && handlers.onDelta) handlers.onDelta(payload)
-        else if (name === 'done' && handlers.onDone) handlers.onDone(payload)
-        else if (name === 'error' && handlers.onError) handlers.onError(payload)
+        const handler = name && handlers[name]
+        if (typeof handler === 'function') handler(payload)
       }
 
       for (;;) {
@@ -483,6 +537,16 @@ window.__ModuleLoader__.load({
         }
       }
       dispatch()
+    }
+
+    /** Single-shot enhancement (`/enhance`). */
+    function streamEnhance(body, handlers, signal) {
+      return streamSse('/enhance', body, handlers, signal)
+    }
+
+    /** Automatic mode (`/candidates`): three route-tagged candidates. */
+    function streamCandidates(body, handlers, signal) {
+      return streamSse('/candidates', body, handlers, signal)
     }
 
     /* ---------------------------------------------------------------- */
@@ -689,6 +753,7 @@ window.__ModuleLoader__.load({
       const [open, setOpen] = useState(false)
       const [catalog, setCatalog] = useState(null)
       const [catalogError, setCatalogError] = useState('')
+      const [view, setView] = useState(() => pickView(prefs))
       const [mode, setMode] = useState(() => (prefs && MODE_CHOICES.includes(prefs.mode) ? prefs.mode : 'code'))
       const [variants, setVariants] = useState(() => pickVariants(prefs))
       const [focus, setFocus] = useState(() => pickFocus(prefs))
@@ -709,6 +774,10 @@ window.__ModuleLoader__.load({
       const [error, setError] = useState('')
       const [notice, setNotice] = useState('')
       const [placement, setPlacement] = useState(null)
+      const [autoSlots, setAutoSlots] = useState([])
+      const [autoMeta, setAutoMeta] = useState(null)
+      const [autoStage, setAutoStage] = useState('idle')
+      const [autoError, setAutoError] = useState('')
 
       const rootRef = useRef(null)
       const triggerRef = useRef(null)
@@ -769,8 +838,8 @@ window.__ModuleLoader__.load({
       }, [open])
 
       useEffect(() => {
-        writePrefs({ mode, variants, focus, depth, methodology, docPath, lang })
-      }, [mode, variants, focus, depth, methodology, docPath, lang])
+        writePrefs({ view, mode, variants, focus, depth, methodology, docPath, lang })
+      }, [view, mode, variants, focus, depth, methodology, docPath, lang])
 
       useEffect(() => {
         currentLanguage = lang
@@ -1112,6 +1181,145 @@ window.__ModuleLoader__.load({
         if (abortRef.current) abortRef.current.abort()
       }, [])
 
+      /* auto mode ------------------------------------------------------ */
+
+      const resetAuto = useCallback(() => {
+        setAutoStage('idle')
+        setAutoSlots([])
+        setAutoMeta(null)
+        setProgress(null)
+        setAutoError('')
+        setNotice('')
+      }, [])
+
+      const startAuto = useCallback(async () => {
+        if (autoStage === 'running') return
+        const prompt = trimmedDraft
+        if (!prompt) {
+          setAutoError(LABELS.emptyDraft)
+          return
+        }
+        setAutoError('')
+        setNotice('')
+        setAutoStage('running')
+        setAutoSlots([])
+        setAutoMeta(null)
+        setProgress(null)
+        insertionRef.current = captureInsertion()
+        beat('auto-start', `${depth}`)
+
+        const controller = new AbortController()
+        abortRef.current = controller
+        let settled = false
+        const body = {
+          prompt,
+          depth,
+          ...(sessionCwd ? { cwd: sessionCwd } : {}),
+          ...(sessionId ? { sessionId } : {}),
+        }
+
+        try {
+          await streamCandidates(
+            body,
+            {
+              meta: (payload) => setAutoMeta(payload || null),
+              status: (payload) => {
+                if (!payload) return
+                if (payload.stage === 'intent' || payload.stage === 'plan') setAutoMeta((previous) => ({ ...(previous || {}), ...payload }))
+                setProgress(payload)
+              },
+              delta: (payload) => {
+                const slot = payload && typeof payload.slot === 'number' ? payload.slot : 0
+                const piece = payload && typeof payload.text === 'string' ? payload.text : ''
+                if (!piece) return
+                setAutoSlots((previous) => {
+                  const next = previous.slice()
+                  let record = next.find((item) => item.slot === slot)
+                  if (!record) {
+                    record = { slot, route: '', label: '', reason: '', text: '', status: 'running' }
+                    next.push(record)
+                  }
+                  record.text += piece
+                  return next
+                })
+              },
+              'slot-error': (payload) => {
+                const slot = payload && typeof payload.slot === 'number' ? payload.slot : 0
+                setAutoSlots((previous) => {
+                  const next = previous.slice()
+                  let record = next.find((item) => item.slot === slot)
+                  if (!record) {
+                    record = { slot, route: '', label: '', reason: '', text: '', status: 'failed' }
+                    next.push(record)
+                  }
+                  record.status = 'failed'
+                  return next
+                })
+              },
+              'slot-done': (payload) => {
+                const slot = payload && typeof payload.slot === 'number' ? payload.slot : 0
+                setAutoSlots((previous) => {
+                  const next = previous.slice()
+                  const record = next.find((item) => item.slot === slot)
+                  if (record) record.status = 'done'
+                  return next
+                })
+              },
+              done: (payload) => {
+                settled = true
+                const slots = payload && Array.isArray(payload.slots) ? payload.slots : []
+                setAutoSlots(
+                  slots.map((item) => ({
+                    slot: typeof item.slot === 'number' ? item.slot : 0,
+                    route: typeof item.route === 'string' ? item.route : '',
+                    label: typeof item.label === 'string' ? item.label : '',
+                    labelEn: typeof item.labelEn === 'string' ? item.labelEn : '',
+                    reason: typeof item.reason === 'string' ? item.reason : '',
+                    text: typeof item.text === 'string' ? item.text : '',
+                    status: 'done',
+                  })),
+                )
+                setAutoMeta((previous) => ({
+                  ...(previous || {}),
+                  intent: payload && payload.intent,
+                  intentSummary: payload && payload.intentSummary,
+                  depth: payload && payload.depth,
+                  durationMs: payload && payload.durationMs,
+                }))
+                setProgress(null)
+                setAutoStage('done')
+              },
+              error: (payload) => {
+                settled = true
+                setAutoError((payload && payload.message) || LABELS.autoFailed)
+                setAutoStage('error')
+              },
+            },
+            controller.signal,
+          )
+          if (!settled) {
+            setAutoStage((previous) => {
+              if (previous !== 'running') return previous
+              return 'done'
+            })
+          }
+        } catch (failure) {
+          if (failure && failure.name === 'AbortError') {
+            setAutoSlots((previous) => {
+              const next = previous.slice()
+              for (const record of next) if (record.status === 'running') record.status = 'done'
+              return next
+            })
+            setAutoStage((previous) => (previous === 'running' ? 'done' : previous))
+          } else {
+            setAutoError((failure && failure.message) || LABELS.autoFailed)
+            setAutoStage('error')
+          }
+        } finally {
+          if (abortRef.current === controller) abortRef.current = null
+        }
+      }, [autoStage, captureInsertion, depth, lang, sessionCwd, sessionId, trimmedDraft])
+
       /* apply ---------------------------------------------------------- */
 
       const writeDraft = useCallback(
@@ -1182,6 +1390,31 @@ window.__ModuleLoader__.load({
         }
       }, [result])
 
+      const useCandidate = useCallback(
+        (text) => {
+          const value = typeof text === 'string' ? text.trim() : ''
+          if (!value) return
+          if (writeDraft(value)) {
+            setNotice(LABELS.autoUsed)
+            window.setTimeout(() => setNotice(''), 1600)
+            setOpen(false)
+          }
+        },
+        [writeDraft],
+      )
+
+      const copyCandidate = useCallback(async (text) => {
+        const value = typeof text === 'string' ? text.trim() : ''
+        if (!value) return
+        try {
+          await navigator.clipboard.writeText(value)
+          setNotice(LABELS.copied)
+          window.setTimeout(() => setNotice(''), 1600)
+        } catch {
+          setNotice(LABELS.copyFailed)
+        }
+      }, [])
+
       /* render helpers ------------------------------------------------- */
 
       const catalogModes = catalog && Array.isArray(catalog.modes) ? catalog.modes : []
@@ -1238,6 +1471,30 @@ window.__ModuleLoader__.load({
           ),
           languageChips,
           h('button', { type: 'button', className: 'dpe-x', onClick: () => setOpen(false), 'aria-label': LABELS.close, title: LABELS.close }, '×'),
+        )
+
+        const viewTabs = h(
+          'div',
+          { className: 'dpe-tabs dpe-view-tabs', role: 'tablist', 'aria-label': LABELS.viewLabel },
+          ...VIEW_CHOICES.map((id) =>
+            h(
+              'button',
+              {
+                key: id,
+                type: 'button',
+                role: 'tab',
+                className: 'dpe-tab',
+                'data-active': view === id ? 'true' : 'false',
+                'aria-selected': view === id ? 'true' : 'false',
+                onClick: () => {
+                  setView(id)
+                  setError('')
+                  setAutoError('')
+                },
+              },
+              id === 'auto' ? LABELS.tabAuto : LABELS.tabAdvanced,
+            ),
+          ),
         )
 
         const tabs = h(
@@ -1485,6 +1742,111 @@ window.__ModuleLoader__.load({
             ? h('div', { className: 'dpe-note dpe-note-error' }, LABELS.errorPrefix, catalogError)
             : null
 
+        const autoErrorNote = autoError
+          ? h('div', { className: 'dpe-note dpe-note-error' }, LABELS.errorPrefix, autoError)
+          : null
+
+        const autoNoticeLine = autoMeta && autoMeta.intent
+          ? h(
+              'div',
+              { className: 'dpe-meta' },
+              h('span', null, `${LABELS.autoIntent}: ${LABELS.intentOf(autoMeta.intent)}`),
+              autoMeta.intentSummary ? h('span', null, autoMeta.intentSummary) : null,
+              autoMeta.durationMs ? h('span', null, `${(autoMeta.durationMs / 1000).toFixed(1)}s`) : null,
+            )
+          : null
+
+        const autoCandidates = autoSlots.length
+          ? h(
+              'div',
+              { className: 'dpe-auto-candidates' },
+              h('div', { className: 'dpe-label' }, LABELS.autoCandidates),
+              h('div', { className: 'dpe-label dpe-sub' }, LABELS.autoPickHint),
+              ...autoSlots.map((item) => {
+                const routeLabel = item.route ? w('route', item.route) || item.route : item.route
+                const label = item.label || routeLabel
+                const statusText =
+                  item.status === 'running'
+                    ? LABELS.autoRunning
+                    : item.status === 'failed'
+                      ? LABELS.slotFailed
+                      : ''
+                return h(
+                  'div',
+                  { key: item.slot, className: 'dpe-card dpe-auto-card', 'data-status': item.status },
+                  h(
+                    'div',
+                    { className: 'dpe-card-title' },
+                    `${routeLabel ? `${routeLabel} · ` : ''}${label}`,
+                  ),
+                  item.reason ? h('div', { className: 'dpe-card-hint' }, item.reason) : null,
+                  h('div', { className: 'dpe-stream dpe-auto-text' }, item.text || statusText || LABELS.slotWaiting),
+                  h(
+                    'div',
+                    { className: 'dpe-actions' },
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        className: 'dpe-btn dpe-btn-primary',
+                        disabled: !item.text.trim(),
+                        onClick: () => useCandidate(item.text),
+                      },
+                      LABELS.autoUse,
+                    ),
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        className: 'dpe-btn',
+                        disabled: !item.text.trim(),
+                        onClick: () => copyCandidate(item.text),
+                      },
+                      LABELS.autoCopy,
+                    ),
+                  ),
+                )
+              }),
+            )
+          : null
+
+        const autoBody = h(
+          'div',
+          null,
+          h('div', { className: 'dpe-label dpe-sub' }, LABELS.autoHint),
+          autoStage === 'running'
+            ? h(
+                'div',
+                null,
+                h('div', { className: 'dpe-stream', ref: streamRef }, runningHint),
+                h(
+                  'div',
+                  { className: 'dpe-actions', style: { marginTop: '8px' } },
+                  h('button', { type: 'button', className: 'dpe-btn dpe-btn-danger', onClick: stop }, LABELS.stop),
+                  h('span', { className: 'dpe-label' }, LABELS.streamHint),
+                ),
+              )
+            : h(
+                'div',
+                { className: 'dpe-actions' },
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'dpe-btn dpe-btn-primary',
+                    disabled: !trimmedDraft,
+                    onClick: startAuto,
+                  },
+                  LABELS.autoStart,
+                ),
+                h('span', { className: 'dpe-label' }, trimmedDraft ? LABELS.readyHint : LABELS.emptyDraft),
+              ),
+          autoNoticeLine,
+          autoCandidates,
+          autoStage === 'idle' && autoError ? autoErrorNote : null,
+          depthRow,
+        )
+
         const metaLine = meta
           ? h(
               'div',
@@ -1583,15 +1945,10 @@ window.__ModuleLoader__.load({
           },
           head,
           catalogError ? errorNote : null,
-          tabs,
-          cards,
-          focusRow,
-          depthRow,
-          methodRow,
-          workspaceNote,
-          documentNote,
-          stage === 'idle' && error ? errorNote : null,
-          body,
+          viewTabs,
+          view === 'auto' ? autoBody : [tabs, cards, focusRow, depthRow, methodRow, workspaceNote, documentNote],
+          view === 'advanced' && stage === 'idle' && error ? errorNote : null,
+          view === 'advanced' ? body : null,
         )
       }
 
@@ -1633,7 +1990,7 @@ window.__ModuleLoader__.load({
     return {
       inject: ['slots'],
       apply(ctx) {
-        beat('client-apply', 'v1.4.2')
+        beat('client-apply', 'v1.5.0')
         // Follow DeepSeek Harness on first run; an explicit choice overrides it.
         try {
           const locale = typeof ctx.get === 'function' ? ctx.get('locale') : null

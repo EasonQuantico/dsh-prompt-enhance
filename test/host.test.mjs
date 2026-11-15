@@ -413,6 +413,188 @@ test('/enhance returns 503 when no model route exists', async () => {
 })
 
 /* ------------------------------------------------------------------ */
+/* /candidates (automatic mode)                                        */
+/* ------------------------------------------------------------------ */
+
+test('/candidates rejects bad requests with stable error codes', async () => {
+  const cases = [
+    [{ prompt: '' }, 400, 'empty-prompt'],
+    [{ prompt: 'x'.repeat(201) }, 413, 'prompt-too-long'],
+    [{ prompt: 'hi', depth: 'epic' }, 400, 'bad-depth'],
+  ]
+  for (const [body, status, code] of cases) {
+    const { handler } = mount()
+    const response = await call(handler, {
+      method: 'POST',
+      url: '/prompt-enhance/api/candidates',
+      headers: { 'sec-fetch-site': 'same-origin' },
+      body,
+    })
+    assert.equal(response.statusCode, status, `${code} should return ${status}`)
+    assert.equal(response.json().error.code, code)
+  }
+
+  const { handler } = mount({ config: { provider: '', model: '' }, selection: null, providers: [] })
+  const response = await call(handler, {
+    method: 'POST',
+    url: '/prompt-enhance/api/candidates',
+    headers: { 'sec-fetch-site': 'same-origin' },
+    body: { prompt: 'hi' },
+  })
+  assert.equal(response.statusCode, 503)
+  assert.equal(response.json().error.code, 'no-model')
+})
+
+test('/candidates recognizes the intent and streams three route-tagged candidates', async () => {
+  const script = JSON.stringify({ intent: 'creative', summary: '雨夜咖啡馆短片剧本', keywords: ['剧本', '短片'] })
+
+  // A queue: the first call is the intent probe, then one stream per candidate.
+  const intentChunks = [
+    { type: 'text-delta', text: script },
+    { type: 'finish', reason: { kind: 'stop' } },
+  ]
+  const perCandidate = [
+    [{ type: 'text-delta', text: '### 剧本候选 A\n雨夜咖啡馆的场景卡。' }, { type: 'finish', reason: { kind: 'stop' } }],
+    [{ type: 'text-delta', text: '### 剧本候选 B\n编剧路线的节拍表。' }, { type: 'finish', reason: { kind: 'stop' } }],
+    [{ type: 'text-delta', text: '### 剧本候选 C\n结构路线的骨架。' }, { type: 'finish', reason: { kind: 'stop' } }],
+  ]
+  const calls = []
+  let callIndex = 0
+  const streamFn = (...args) => {
+    calls.push(args[0])
+    const chunks = callIndex === 0 ? intentChunks : perCandidate[callIndex - 1]
+    callIndex += 1
+    return (async function* run() {
+      for (const chunk of chunks) yield chunk
+    })()
+  }
+
+  const { handler } = mount({ stream: streamFn })
+  const response = await call(handler, {
+    method: 'POST',
+    url: '/prompt-enhance/api/candidates',
+    headers: { 'sec-fetch-site': 'same-origin' },
+    body: { prompt: '写一个雨夜咖啡馆的短片剧本', depth: 'default' },
+  })
+
+  assert.equal(response.statusCode, 200)
+  assert.match(response.headers['content-type'], /^text\/event-stream/)
+
+  const events = response.sse()
+  const meta = events.find((item) => item.event === 'meta').data
+  assert.equal(meta.provider, 'test-provider')
+  assert.equal(meta.depth, 'default')
+  assert.deepEqual(meta.routes, ['methodology', 'act', 'structure'])
+  assert.equal(meta.stage, 'intent')
+
+  const intent = events.find((item) => item.event === 'status' && item.data.stage === 'intent').data
+  assert.equal(intent.intent, 'creative')
+  assert.equal(intent.source, 'model')
+
+  const plan = events.find((item) => item.event === 'status' && item.data.stage === 'plan').data
+  assert.equal(plan.intent, 'creative')
+  assert.equal(plan.candidates.length, 3)
+  assert.deepEqual(plan.candidates.map((item) => item.slot), [0, 1, 2])
+  assert.equal(plan.candidates.find((item) => item.route === 'act').label, '编剧')
+
+  for (const slot of [0, 1, 2]) {
+    assert.ok(events.some((item) => item.event === 'slot-done' && item.data.slot === slot), `slot ${slot} completed`)
+  }
+  const done = events.find((item) => item.event === 'done').data
+  assert.equal(done.intent, 'creative')
+  assert.equal(done.slots.length, 3)
+  assert.deepEqual(done.slots.map((item) => item.route), ['methodology', 'act', 'structure'])
+  assert.ok(done.slots[1].text.includes('编剧路线'))
+  assert.ok(done.slots[0].reason.length > 0)
+
+  // One intent call + three candidate calls, each a single user message.
+  assert.equal(calls.length, 4)
+  const enhanceCall = calls[1]
+  assert.match(enhanceCall.messages[0].content[0].text, /^<增强指令>\n/)
+  assert.match(enhanceCall.messages[0].content[0].text, /<\/增强指令>\n\n<用户原提示词>\n/)
+  assert.match(enhanceCall.messages[0].content[0].text, /<\/用户原提示词>$/)
+})
+
+test('/candidates falls back to a heuristic intent when the model answer is not JSON', async () => {
+  const { stream } = recordingStream([
+    { type: 'text-delta', text: '抱歉，我不能只输出 JSON。' },
+    { type: 'finish', reason: { kind: 'stop' } },
+  ])
+  let extra = 0
+  const streamFn = (...args) => {
+    if (extra === 0) {
+      extra += 1
+      return stream(...args)
+    }
+    return (async function* run() {
+      yield { type: 'text-delta', text: '候选项' }
+      yield { type: 'finish', reason: { kind: 'stop' } }
+    })()
+  }
+  const { handler } = mount({ stream: streamFn })
+  const response = await call(handler, {
+    method: 'POST',
+    url: '/prompt-enhance/api/candidates',
+    headers: { 'sec-fetch-site': 'same-origin' },
+    body: { prompt: '给桌面小工具加批量重命名：选择文件夹、按日期改名、可撤销' },
+  })
+  const events = response.sse()
+  const intent = events.find((item) => item.event === 'status' && item.data.stage === 'intent').data
+  assert.equal(intent.source, 'heuristic')
+  assert.ok(['code', 'creative', 'doc'].includes(intent.intent))
+})
+
+test('/candidates keeps going when one route fails and reports slot-error', async () => {
+  const script = JSON.stringify({ intent: 'code', summary: '', keywords: [] })
+  const intentChunks = [
+    { type: 'text-delta', text: script },
+    { type: 'finish', reason: { kind: 'stop' } },
+  ]
+  // One fresh generator per call — never hand the host a consumed iterator.
+  const streamFn = () => {
+    if (!streamFn.used) {
+      streamFn.used = true
+      return (async function* intent() {
+        for (const chunk of intentChunks) yield chunk
+      })()
+    }
+    if (!streamFn.failedYet) {
+      streamFn.failedYet = true
+      return (async function* failing() {
+        yield { type: 'finish', reason: { kind: 'error', failure: { message: '模型过载' } } }
+      })()
+    }
+    return (async function* ok() {
+      yield { type: 'text-delta', text: '候选内容' }
+      yield { type: 'finish', reason: { kind: 'stop' } }
+    })()
+  }
+  const { handler } = mount({ stream: streamFn })
+  const response = await call(handler, {
+    method: 'POST',
+    url: '/prompt-enhance/api/candidates',
+    headers: { 'sec-fetch-site': 'same-origin' },
+    body: { prompt: '做一个上传报销单的网页' },
+  })
+  const events = response.sse()
+  assert.ok(events.some((item) => item.event === 'slot-error' && item.data.slot === 0), 'slot 0 failed')
+  const done = events.find((item) => item.event === 'done').data
+  assert.equal(done.slots.length, 2, 'the remaining two candidates still arrive')
+  assert.ok(!done.slots.some((item) => item.slot === 0), 'the failed slot is not in the result')
+})
+
+test('/state lists the act roles and auto routes', async () => {
+  const { handler } = mount()
+  const response = await call(handler, { method: 'GET', url: '/prompt-enhance/api/state' })
+  const body = response.json()
+  assert.ok(Array.isArray(body.acts) && body.acts.length >= 8, 'the act catalogue is exposed')
+  for (const act of body.acts) {
+    assert.ok(act.id && act.zh && act.en && Array.isArray(act.applies), 'acts are bilingual and scoped')
+  }
+  assert.deepEqual(body.routes.map((item) => item.id), ['methodology', 'act', 'structure'])
+})
+
+/* ------------------------------------------------------------------ */
 /* /enhance streaming                                                 */
 /* ------------------------------------------------------------------ */
 

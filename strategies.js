@@ -329,6 +329,195 @@ export function methodologyById(id) {
   return METHODOLOGY_BY_ID.get(id)
 }
 
+/**
+ * Act roles for the automatic mode. The *techniques* (what each role demands of
+ * the executing agent) are distilled from the act cards in f/prompts.chat, which
+ * is licensed CC-BY-NC — so no card text is copied here; every brief is our own
+ * Chinese wording of the technique. Provenance: docs/research/prompt-sources.md.
+ */
+export const ACT_ROLES = [
+  {
+    id: 'act-code-review',
+    zh: '代码评审员',
+    en: 'Code Reviewer',
+    applies: ['code'],
+    keywords: ['review', '评审', '审查', '重构', 'refactor', '优化', '性能', '可读性', 'bug', '修复'],
+    brief: '以资深评审视角改写：逐条列出改动点与风险、每条带验收判据，区分「必须改」与「建议改」。',
+  },
+  {
+    id: 'act-qa-gate',
+    zh: '质量保障测试员',
+    en: 'QA Tester',
+    applies: ['code'],
+    keywords: ['测试', 'test', '用例', '边界', '回归', '验收', '质量'],
+    brief: '以测试员视角改写：先列正常路径与边界用例，再给每条用例的预期结果与判失败条件。',
+  },
+  {
+    id: 'act-security-auditor',
+    zh: '安全审计师',
+    en: 'Cyber Security Specialist',
+    applies: ['code'],
+    keywords: ['安全', 'security', '漏洞', '注入', '越权', '密钥', '加密', '防护'],
+    brief: '以安全审计视角改写：明确信任边界与攻击面，每条需求附威胁场景与对应的校验/防护措施。',
+  },
+  {
+    id: 'act-architect',
+    zh: '系统架构师',
+    en: 'IT Architect',
+    applies: ['code'],
+    keywords: ['架构', 'architecture', '框架', '模块', '设计', '选型', '目录', '分层', '微服务'],
+    brief: '以架构师视角改写：先定技术栈与分层，再给模块职责、接口签名与依赖方向，禁止越层调用。',
+  },
+  {
+    id: 'act-tech-writer',
+    zh: '技术文档工程师',
+    en: 'Tech Writer',
+    applies: ['doc', 'code'],
+    keywords: ['文档', 'readme', '说明', '手册', '注释', 'api 文档', 'tutorial', '指南'],
+    brief: '以技术写作者视角改写：读者与使用场景先行，每节先回答「读者读完能做什么」，术语表统一。',
+  },
+  {
+    id: 'act-screenwriter',
+    zh: '编剧',
+    en: 'Screenwriter',
+    applies: ['creative'],
+    keywords: ['剧本', '脚本', '短片', '分镜', '场景', '对白', '台词', 'screenplay', 'logline'],
+    brief: '以编剧视角改写：先给一句话故事线，再落成场景卡（场号/时间/地点/人物/冲突/转折）与台词风格。',
+  },
+  {
+    id: 'act-novelist',
+    zh: '小说家',
+    en: 'Novelist',
+    applies: ['creative'],
+    keywords: ['小说', '故事', '情节', '人物', '章节', 'novel', 'fiction', '叙事', '文笔'],
+    brief: '以小说家视角改写：补人物动机与缺陷、叙事视角与时态、场景感官细节，用具体名词替换抽象形容。',
+  },
+  {
+    id: 'act-copy-editor',
+    zh: '文案润色师',
+    en: 'Writing Tutor',
+    applies: ['creative', 'doc'],
+    keywords: ['文案', '润色', '语气', '风格', '改写', '措辞', '品牌', '口号', 'slogan'],
+    brief: '以文案润色视角改写：保持原意与声音，指出每处改动为什么更好，给出禁用词与语气边界。',
+  },
+  {
+    id: 'act-translator',
+    zh: '翻译润色员',
+    en: 'Translator and Improver',
+    applies: ['creative', 'doc'],
+    keywords: ['翻译', 'translate', '英文', '中文', '双语', 'localization', '本地化'],
+    brief: '以译者视角改写：语义忠实优先于字面对应，标出文化差异处理方式与术语表，保持原语气。',
+  },
+  {
+    id: 'act-summarizer',
+    zh: '摘要撰写者',
+    en: 'Book Summarizer',
+    applies: ['doc'],
+    keywords: ['摘要', '总结', 'summarize', '提炼', '纪要', '概述', 'outline'],
+    brief: '以摘要者视角改写：先给分层结论（一句话/一段/分节），每层都标注信息来源与省略了什么。',
+  },
+]
+
+const ACT_BY_ID = new Map(ACT_ROLES.map((item) => [item.id, item]))
+
+export function actById(id) {
+  return ACT_BY_ID.get(id)
+}
+
+/**
+ * Pick one act role for the automatic mode from the recognized intent and the
+ * user's wording. Deterministic: keyword hits first, then intent affinity.
+ */
+export function selectAct({ intent, prompt = '', requested = '' }) {
+  if (requested) {
+    const chosen = ACT_BY_ID.get(requested)
+    if (chosen) return chosen
+  }
+  const text = String(prompt || '').toLowerCase()
+  let best = null
+  let bestScore = -1
+  for (const role of ACT_ROLES) {
+    if (!role.applies.includes(intent)) continue
+    let score = 0.2
+    for (const word of role.keywords) if (text.includes(word)) score += 1
+    if (score > bestScore) {
+      bestScore = score
+      best = role
+    }
+  }
+  if (!best) {
+    const fallback = intent === 'creative' ? 'act-novelist' : intent === 'doc' ? 'act-tech-writer' : 'act-architect'
+    best = ACT_BY_ID.get(fallback) || ACT_ROLES[0]
+  }
+  return best
+}
+
+/** Intent (from the auto mode) to the variant the advanced panel would have used. */
+const INTENT_VARIANT = { code: 'code-only', creative: 'creative-rich', doc: 'doc-draft' }
+
+export function variantForIntent(intent) {
+  return INTENT_VARIANT[intent] || 'code-only'
+}
+
+/** Bilingual labels for the three auto candidates, keyed by route. */
+export const AUTO_ROUTES = [
+  { id: 'methodology', label: '方法论路线' },
+  { id: 'act', label: '角色路线' },
+  { id: 'structure', label: '结构路线' },
+]
+
+/**
+ * Build the system prompt for one automatic candidate.
+ * `route` is one of `AUTO_ROUTES[].id`; `act`/`methodology` carry the chosen
+ * helper for that candidate. The output contract matches the single-shot mode
+ * so the three candidates stay comparable.
+ */
+export function buildAutoPrompt({ promptText, intent, route, methodology, act, depth = 'default' }) {
+  const variant = variantForIntent(intent)
+  const parts = []
+  parts.push('你是一名资深提示词工程师，负责把用户草稿级的提示词改写为高质量、可执行的提示词。')
+  parts.push(`本次增强：自动模式（识别为${intent === 'code' ? '代码' : intent === 'creative' ? '创作' : '文档'}类，路线：${route === 'methodology' ? '方法论' : route === 'act' ? '角色' : '结构'}）。`)
+
+  if (route === 'act' && act) {
+    parts.push(
+      [
+        `角色手法（${act.zh} / ${act.en}，源自 prompts.chat 的 act 卡片手法，CC BY-NC，仅手法不引文）：`,
+        act.brief,
+        '把上述手法写成对「将来执行该提示词的代理」的要求，不是让你现在执行用户的任务。',
+      ].join('\n'),
+    )
+  }
+
+  if (methodology && methodology.id) {
+    const fragment = intent === 'doc' ? methodology.docSystem || methodology.creativeSystem || methodology.codeSystem : intent === 'code' ? methodology.codeSystem : methodology.creativeSystem || methodology.codeSystem
+    const principles = Array.isArray(methodology.principles) ? methodology.principles.map((item) => `- ${item}`).join('\n') : ''
+    parts.push(
+      [
+        `方法论（${methodology.label}${methodology.source ? `，参考 ${methodology.source}` : ''}）：`,
+        '把下列手法写进增强后的提示词。它们描述的是「将来执行该提示词的代理」应如何工作，不是让你现在去执行用户的任务。',
+        fragment,
+        principles ? `核心原则（可择要写入）：\n${principles}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    )
+  }
+
+  const rules = VARIANT_RULES[variant] || VARIANT_RULES['code-only']
+  parts.push(rules.join('\n'))
+
+  if (intent === 'code') parts.push(FOCUS_RULES.framework.flat().join('\n'))
+
+  const methodologyId = methodology && methodology.id ? methodology.id : 'superpower'
+  const budget = depthBudget({ depth, methodologyId })
+  parts.push(renderDepthRule({ depth, methodologyId, budget }))
+  parts.push(OUTPUT_CONTRACT)
+  if (intent === 'doc') parts.push(docOutputRule(budget))
+  parts.push(`用户原提示词语言：${languageOf(promptText)}，输出必须使用该语言。`)
+
+  return parts.join('\n\n')
+}
+
 /** Public catalogue for the client (no fragment text). */
 export function methodologyCatalogue() {
   return [
@@ -431,6 +620,8 @@ export function selectMethodology({ mode, variant, focus = [], prompt = '', requ
   return {
     id: best.id,
     reason: `${variantLabel} 场景下 ${best.label} 的结构化手法最贴合（自动选择）`,
+    /** Full preference order — the auto mode uses ranked[1] as its "structure" candidate. */
+    ranked: ranked.map(([id]) => id).filter((id) => methodologyById(id)),
   }
 }
 

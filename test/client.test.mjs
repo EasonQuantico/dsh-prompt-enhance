@@ -252,7 +252,7 @@ test('the language follows the harness until the user picks one', () => {
   assert.ok(source.includes('dpe-lang'), 'the panel header carries the two language chips')
   assert.ok(source.includes("LANGUAGE_LABELS = { zh: '中文', en: 'English' }"), 'chips are labelled in their own language')
   assert.ok(
-    source.includes('writePrefs({ mode, variants, focus, depth, methodology, docPath, lang })'),
+    source.includes('writePrefs({ view, mode, variants, focus, depth, methodology, docPath, lang })'),
     'the choice is remembered with the other preferences',
   )
 })
@@ -308,5 +308,45 @@ test('the panel claims the top layer and follows the window', () => {
   const css = source.slice(source.indexOf('const CSS = `'), source.indexOf('`.trim()', source.indexOf('const CSS = `')))
   assert.ok(/\.dpe-panel\s*\{[^}]*inset:\s*auto/.test(css), 'the UA popover inset is reset')
   assert.ok(/\.dpe-panel\s*\{[^}]*box-sizing:\s*border-box/.test(css), 'padding counts against max-height')
+})
+
+test('browser half offers the automatic mode', () => {
+  assert.ok(source.includes("VIEW_CHOICES = ['auto', 'advanced']"), 'the auto and advanced views are a pair')
+  assert.ok(source.includes("tabAuto: '自动'"), 'the auto tab has a label')
+  assert.ok(source.includes("tabAdvanced: '高级'"), 'the advanced tab has a label')
+  assert.ok(source.includes('pickView'), 'the chosen view is remembered')
+  assert.ok(source.includes('viewLabel'), 'the view tabs have an aria label')
+  assert.ok(source.includes('viewTabs'), 'the view tab row is rendered')
+  assert.ok(source.includes('autoStart'), 'the auto mode has its own action')
+  assert.ok(source.includes('autoCandidates'), 'candidates are listed')
+  assert.ok(source.includes('autoUse'), 'each candidate can be written back')
+  assert.ok(source.includes('useCandidate'), 'writing back goes through the composer helpers')
+  assert.ok(source.includes('intentOf'), 'the recognized intent is shown in words')
+  assert.ok(source.includes('streamCandidates'), 'the browser calls /candidates')
+})
+
+test('the auto view shows candidates while the advanced view keeps its rows', () => {
+  // The panel mounts only when open; assert the view switch in source instead.
+  assert.ok(source.includes("view === 'auto' ? autoBody :"), 'the auto view takes over the panel body')
+  assert.ok(
+    source.includes("[tabs, cards, focusRow, depthRow, methodRow, workspaceNote, documentNote]"),
+    'the advanced view keeps the classic rows',
+  )
+  assert.ok(source.includes("view === 'advanced' ? body : null"), 'the advanced body stays in its view')
+  assert.ok(source.includes('autoBody'), 'the auto body exists')
+  assert.ok(source.includes('LABELS.autoStart'), 'the auto action is labelled')
+  assert.ok(source.includes('LABELS.autoHint'), 'the auto view explains itself')
+  assert.ok(source.includes("id === 'auto' ? LABELS.tabAuto : LABELS.tabAdvanced"), 'view tabs switch by id')
+  // The depth selector is shared between both views.
+  assert.ok(source.includes('autoBody = h(') && source.includes('depthRow,') , 'depth stays reachable in auto')
+})
+
+test('the auto candidates carry provenance labels', () => {
+  assert.ok(source.includes('autoPickHint'), 'candidates explain where they come from')
+  assert.ok(source.includes("w('route', item.route)"), 'route labels are bilingual')
+  assert.ok(source.includes('slotFailed'), 'a failed route says so instead of vanishing')
+  assert.ok(source.includes('slotWaiting'), 'a pending route shows a waiting line')
+  assert.ok(source.includes("'slot-error'"), 'slot errors are tracked per route')
+  assert.ok(source.includes("'slot-done'"), 'finishing one route marks it done')
 })
 
