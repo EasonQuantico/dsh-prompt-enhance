@@ -88,7 +88,7 @@ so every write must be guarded by loopback + same-origin + JSON content-type che
 ```json
 {
   "ok": true,
-  "version": "1.4.1",
+  "version": "1.4.2",
   "provider": "workbuddy2api-hub",
   "model": "deepseek-v4.1-flash",
   "modelSource": "session-default",
@@ -269,7 +269,14 @@ UI requirements:
 1. A compact pill button in the composer control row (`✨ 提示词增强`). It stays clickable
    even with an empty draft — the panel explains what is missing — and is only disabled
    while an enhancement is running and the panel is closed.
-2. Clicking opens a popover panel anchored above the button:
+2. Clicking opens a popover panel anchored to the button. It is a manual popover
+   (`popover="manual"` + `showPopover()` when available), so it renders in the browser's top layer
+   and cannot be painted over by page-level overlays; placement is measured from the real content
+   height and re-measured on `resize`, composer `scroll`, `visualViewport` changes and content
+   growth. The panel stays inside the viewport, prefers the space above the trigger and, when it has
+   to overlap the composer, slides beside the trigger instead of covering it (no room below ~600 px
+   of width). Inside it:
+
    - 代码 / 创作 / 文档 tab switch.
    - Variant cards (radio behaviour) per the vocabulary above; the last choice per family is
      remembered in `localStorage` under `dsh-prompt-enhance.prefs` (panel choices only, never

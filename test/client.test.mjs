@@ -294,3 +294,19 @@ test('panel styles follow the harness styling rules', () => {
   )
 })
 
+test('the panel claims the top layer and follows the window', () => {
+  assert.ok(source.includes('HAS_POPOVER'), 'popover support is feature detected')
+  assert.ok(source.includes("popover: 'manual'"), 'the panel renders as a manual popover')
+  assert.ok(source.includes('showPopover()'), 'opening the panel puts it in the top layer')
+  assert.ok(source.includes('hidePopover()'), 'closing the panel leaves the top layer')
+  assert.ok(source.includes("':popover-open'"), 'membership is checked before toggling')
+  assert.ok(source.includes('visualViewport'), 'zoom and on-screen keyboards re-measure the panel')
+  assert.ok(source.includes('recomputePlacement'), 'placement is measured, not hard-coded')
+  assert.ok(source.includes('PANEL_MARGIN') && source.includes('PANEL_MIN_USABLE'), 'the margins are named constants')
+  assert.ok(source.includes('scrollHeight'), 'placement follows the real content height')
+  assert.ok(source.includes('overlapsTrigger'), 'the panel slides beside the button instead of covering it')
+  const css = source.slice(source.indexOf('const CSS = `'), source.indexOf('`.trim()', source.indexOf('const CSS = `')))
+  assert.ok(/\.dpe-panel\s*\{[^}]*inset:\s*auto/.test(css), 'the UA popover inset is reset')
+  assert.ok(/\.dpe-panel\s*\{[^}]*box-sizing:\s*border-box/.test(css), 'padding counts against max-height')
+})
+

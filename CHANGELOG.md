@@ -13,6 +13,27 @@ All notable changes to this project are documented here. The format follows
   copy is replaced by a junction (or re-installed). Also documents that the Web GUI port changes
   between launches.
 
+## [1.4.2] — 2026-11-15
+
+The panel used to be clipped by the page's own overlay while the composer was on screen. It now lives
+in the browser's top layer and re-places itself for every window size.
+
+### Fixed
+
+- The panel was drawn under the harness' first-run overlay: it was a `position: fixed` node inside the
+  composer stack (`z-index: 1`), so a page-level `z-index: 1000` layer painted over it. The panel is
+  now a manual popover (`popover="manual"` + `showPopover()`), which puts it in the top layer, with a
+  feature test and a plain fixed-position fallback for browsers without the Popover API.
+- The panel no longer collapses into a scroll box when the composer sits mid-window: placement now
+  measures the real content height (`scrollHeight`), fits the panel above or below the trigger when
+  possible, and otherwise slides it up so the whole panel stays inside the viewport.
+- The panel no longer covers the button that opened it: when it has to overlap the composer, it slides
+  beside the trigger instead. Below ~600 px of width there is no room beside the button and the panel
+  keeps covering it, which the ✕ button and outside clicks still resolve.
+- Placement is re-measured on `resize`, composer `scroll`, `visualViewport` changes, and whenever the
+  panel's content grows (workspace note, document list, streaming result), so a resized window never
+  leaves the panel half outside.
+
 ## [1.4.1] — 2026-10-31
 
 Layout follow-ups found by running the panel in a real browser at 1440×900 after the 1.4.0 styling

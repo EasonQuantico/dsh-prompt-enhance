@@ -19,6 +19,13 @@ window.__ModuleLoader__.load({
 
     const API_BASE = '/prompt-enhance/api'
     const PANEL_WIDTH = 384
+    const PANEL_MARGIN = 8
+    const PANEL_MIN_USABLE = 220
+    const PANEL_MAX_HEIGHT = 640
+    // The panel lives in the top layer when the browser has the Popover API,
+    // so no ancestor stacking context (composer masks, hero overlays) can cover it.
+    const HAS_POPOVER =
+      typeof HTMLElement !== 'undefined' && typeof HTMLElement.prototype.showPopover === 'function'
 
     /**
      * Interface copy. `zh` is the source language; `en` mirrors it key for key.
@@ -507,7 +514,7 @@ window.__ModuleLoader__.load({
 .dpe-icon { width: 14px; height: 14px; flex: none; color: var(--dsw-alias-state-business-primary); }
 
 .dpe-panel {
-  position: fixed; z-index: 60; display: flex; flex-direction: column; gap: 10px;
+  position: fixed; inset: auto; margin: 0; z-index: 60; display: flex; flex-direction: column; gap: 10px;
   box-sizing: border-box;
   padding: 14px; border: 0; border-radius: var(--dsw-radius-panel, 14px);
   background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary);
@@ -843,17 +850,55 @@ window.__ModuleLoader__.load({
       const recomputePlacement = useCallback(() => {
         const node = triggerRef.current
         if (!node) return
+        const panel = panelRef.current
         const rect = node.getBoundingClientRect()
-        const width = Math.min(PANEL_WIDTH, Math.max(280, window.innerWidth - 24))
-        const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12))
-        const spaceAbove = rect.top
-        const spaceBelow = window.innerHeight - rect.bottom
-        const openUp = spaceAbove >= 260 || spaceAbove >= spaceBelow
-        setPlacement({
-          left,
-          width,
-          ...(openUp ? { bottom: window.innerHeight - rect.top + 8 } : { top: rect.bottom + 8 }),
-          maxHeight: openUp ? Math.max(200, spaceAbove - 20) : Math.max(200, spaceBelow - 20),
+        const viewWidth = window.innerWidth
+        const viewHeight = window.innerHeight
+        // Leave the panel inside the viewport on narrow windows.
+        const width = Math.max(240, Math.min(PANEL_WIDTH, viewWidth - PANEL_MARGIN * 2))
+        const left = Math.max(PANEL_MARGIN, Math.min(rect.left, viewWidth - width - PANEL_MARGIN))
+        const room = viewHeight - PANEL_MARGIN * 2
+        const spaceAbove = rect.top - PANEL_MARGIN * 2
+        const spaceBelow = viewHeight - rect.bottom - PANEL_MARGIN * 2
+        // How tall the panel wants to be. It scrolls, so `scrollHeight` still
+        // reports the full content height while a previous clamp is applied.
+        const wanted = panel ? Math.ceil(panel.scrollHeight) : PANEL_MIN_USABLE
+        const height = Math.max(PANEL_MIN_USABLE, Math.min(wanted, room, PANEL_MAX_HEIGHT))
+        let next
+        if (height <= spaceAbove) {
+          next = { left, width, bottom: viewHeight - rect.top + PANEL_MARGIN, maxHeight: height }
+        } else if (height <= spaceBelow) {
+          next = { left, width, top: rect.bottom + PANEL_MARGIN, maxHeight: height }
+        } else {
+          // Neither side has room for the whole panel: slide it up (or down)
+          // until it fits the window instead of shrinking it into a scroll box.
+          const above = rect.top - height - PANEL_MARGIN
+          const top = Math.min(Math.max(above, PANEL_MARGIN), Math.max(PANEL_MARGIN, viewHeight - height - PANEL_MARGIN))
+          next = { left, width, top, maxHeight: height }
+        }
+        // Never sit on top of the button that opened the panel: when the panel
+        // has to overlap the composer, slide it beside the trigger instead.
+        const panelTop = next.top === undefined ? viewHeight - next.bottom - height : next.top
+        const overlapsTrigger =
+          panelTop + height > rect.top && panelTop < rect.bottom && left + width > rect.left && left < rect.right
+        if (overlapsTrigger) {
+          const besideLeft = rect.left - width - PANEL_MARGIN
+          const besideRight = rect.right + PANEL_MARGIN
+          if (besideLeft >= PANEL_MARGIN) next.left = besideLeft
+          else if (besideRight + width <= viewWidth - PANEL_MARGIN) next.left = besideRight
+        }
+        setPlacement((previous) => {
+          if (
+            previous &&
+            previous.left === next.left &&
+            previous.width === next.width &&
+            previous.maxHeight === next.maxHeight &&
+            previous.top === next.top &&
+            previous.bottom === next.bottom
+          ) {
+            return previous
+          }
+          return next
         })
       }, [])
 
@@ -868,11 +913,52 @@ window.__ModuleLoader__.load({
         const onResize = () => recomputePlacement()
         window.addEventListener('resize', onResize)
         window.addEventListener('scroll', onResize, true)
+        const visual = window.visualViewport
+        if (visual) {
+          visual.addEventListener('resize', onResize)
+          visual.addEventListener('scroll', onResize)
+        }
         return () => {
           window.removeEventListener('resize', onResize)
           window.removeEventListener('scroll', onResize, true)
+          if (visual) {
+            visual.removeEventListener('resize', onResize)
+            visual.removeEventListener('scroll', onResize)
+          }
         }
       }, [open, recomputePlacement])
+
+      // Re-measure when the content grows or shrinks (workspace note, stream, result).
+      useEffect(() => {
+        if (open) recomputePlacement()
+      }, [open, catalog, documents, documentsBusy, stage, streamText, result, recomputePlacement])
+
+      // Async content (workspace note, document list) can also grow without any
+      // of the above changing, so measure after every render; the state guard
+      // inside `recomputePlacement` keeps this from re-rendering in a loop.
+      useLayoutEffect(() => {
+        if (open) recomputePlacement()
+      })
+
+      // The top layer is the only place an ancestor stacking context cannot cover:
+      // the composer sits in a `z-index: 1` stack below the hero mask, so a plain
+      // fixed panel would render underneath it. Layout effect: show it before paint.
+      useLayoutEffect(() => {
+        const panel = panelRef.current
+        if (!open || !panel || !HAS_POPOVER) return undefined
+        try {
+          if (!panel.matches(':popover-open')) panel.showPopover()
+        } catch {
+          /* already shown, or the element left the document */
+        }
+        return () => {
+          try {
+            if (panel.matches(':popover-open')) panel.hidePopover()
+          } catch {
+            /* the element was detached with the panel */
+          }
+        }
+      }, [open])
 
       /* dismissal ------------------------------------------------------ */
 
@@ -1111,13 +1197,13 @@ window.__ModuleLoader__.load({
 
       const panelStyle = placement
         ? {
-            left: `${placement.left}px`,
-            width: `${placement.width}px`,
-            maxHeight: `${Math.min(placement.maxHeight, 640)}px`,
-            ...(placement.bottom !== undefined ? { bottom: `${placement.bottom}px` } : {}),
-            ...(placement.top !== undefined ? { top: `${placement.top}px` } : {}),
+            left: `${Math.round(placement.left)}px`,
+            width: `${Math.round(placement.width)}px`,
+            maxHeight: `${Math.round(placement.maxHeight)}px`,
+            ...(placement.bottom !== undefined ? { bottom: `${Math.round(placement.bottom)}px` } : {}),
+            ...(placement.top !== undefined ? { top: `${Math.round(placement.top)}px` } : {}),
           }
-        : { left: '12px', width: `${PANEL_WIDTH}px`, bottom: '80px' }
+        : { left: `${PANEL_MARGIN}px`, width: `${PANEL_WIDTH}px`, bottom: '80px', maxHeight: `${PANEL_MAX_HEIGHT}px` }
 
       const renderPanel = () => {
         const languageChips = h(
@@ -1489,6 +1575,7 @@ window.__ModuleLoader__.load({
           {
             className: 'dpe-panel',
             ref: panelRef,
+            ...(HAS_POPOVER ? { popover: 'manual' } : {}),
             role: 'dialog',
             'aria-label': LABELS.title,
             'aria-modal': 'false',
@@ -1546,7 +1633,7 @@ window.__ModuleLoader__.load({
     return {
       inject: ['slots'],
       apply(ctx) {
-        beat('client-apply', 'v1.4.1')
+        beat('client-apply', 'v1.4.2')
         // Follow DeepSeek Harness on first run; an explicit choice overrides it.
         try {
           const locale = typeof ctx.get === 'function' ? ctx.get('locale') : null

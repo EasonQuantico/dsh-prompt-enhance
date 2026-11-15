@@ -24,7 +24,7 @@ import {
   selectMethodology,
 } from './strategies.js'
 
-export const VERSION = '1.4.1'
+export const VERSION = '1.4.2'
 /** `llm` is required for the enhance route; `webServer` is injected locally below. */
 export const inject = ['llm']
 const ROUTE_PREFIX = '/prompt-enhance/api'

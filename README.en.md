@@ -86,6 +86,8 @@ structured, executable, verifiable prompt — written straight into the input bo
 - **⑥ One click to run** — turns into “stop” while streaming; the result is only written to the composer.
 - **⑦ Depth is orthogonal** — concise / default / thorough only control length: the same request can come back
   as three lines or as a full structure.
+- **⑧ Always on top** — the panel is a manual popover, so it renders in the browser's top layer and page
+  overlays cannot cover it; it re-measures on resize and content growth, and slides beside its own ✨ button.
 
 ### The result: edit first, then land it
 
@@ -527,6 +529,8 @@ Contribution rules (encoding, commit format, PR checklist) are in [CONTRIBUTING.
   number for all four sets. The relative gap between levels is stable; don't expect “concise” to land
   under exactly 1428 characters.
 - A blank page with no `sessionId` has no composer control row, so no button is rendered until you enter a session.
+- Below ~600 px of window width the 384 px panel has no room beside its trigger, so it covers the ✨ button
+  (the ✕ button and outside clicks still close it).
 - Verified on the DSH Web GUI only; the Electron IPC form is untested.
 - Upstream prompt text is deliberately *not* merged (LangGPT's licence badge conflicts with its API
   metadata, Prompt Optimizer is non-OSI), so only the techniques are reimplemented.
