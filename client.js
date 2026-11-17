@@ -1,5 +1,5 @@
 /**
- * dsh-prompt-enhance — browser half.
+ * dsh-prompt-enhance-ultra — browser half.
  *
  * Registers one component on the `conversation.input.right` slot — the control
  * row inside the composer that exists in both the hero and the in-session
@@ -7,18 +7,18 @@
  * enhancement families (code / creative / doc), their variants, and the
  * adaptive methodology selector.
  *
- * The component talks to the host half over `/prompt-enhance/api` (JSON + SSE).
+ * The component talks to the host half over `/prompt-enhance-ultra/api` (JSON + SSE).
  */
 
 window.__ModuleLoader__.load({
-  id: 'dsh-prompt-enhance',
+  id: 'dsh-prompt-enhance-ultra',
   factory(require) {
     const React = require('react')
     const { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } = React
     const h = React.createElement
 
-    const API_BASE = '/prompt-enhance/api'
-    const PANEL_WIDTH = 384
+    const API_BASE = '/prompt-enhance-ultra/api'
+    const PANEL_WIDTH = 412
     const PANEL_MARGIN = 8
     const PANEL_MIN_USABLE = 220
     const PANEL_MAX_HEIGHT = 640
@@ -107,8 +107,9 @@ window.__ModuleLoader__.load({
         viewLabel: '模式',
         tabAuto: '自动',
         tabAdvanced: '高级',
-        autoHint: '自动识别草稿的需求类型，从方法论与提示词库各路生成 3 组候选，选一组回填输入框。',
+        autoHint: '自动识别草稿的需求类型，给出两组候选：简洁优化（以你的原话为准）与方法论最佳匹配。选一组回填输入框。不设档位，篇幅随任务本身决定。',
         autoStart: '开始自动优化',
+        autoReady: '每组候选只按任务需要写长或写短，不凑字数，也不会为了简短丢掉必要步骤。',
         autoRunning: '自动优化中…',
         autoIntent: '需求识别',
         autoPlan: '生成计划',
@@ -116,13 +117,12 @@ window.__ModuleLoader__.load({
         autoUse: '使用这组',
         autoCopy: '复制',
         autoUsed: '已回填输入框',
-        autoPickHint: '每组候选标注了参考来源（方法论或提示词库角色）。',
+        autoPickHint: '每组候选标注了来源（简洁优化 / 方法论最佳匹配）。',
         intentCode: '代码类',
         intentCreative: '创作类',
         intentDoc: '文档类',
-        routeMethodology: '方法论路线',
-        routeAct: '角色路线',
-        routeStructure: '结构路线',
+        routeConcise: '简洁优化',
+        routeMethodology: '方法论最佳匹配',
         slotWaiting: '等待生成…',
         slotFailed: '该路线生成失败',
         intentOf: (intent) => (intent === 'code' ? '识别为代码类' : intent === 'creative' ? '识别为创作类' : '识别为文档类'),
@@ -203,8 +203,9 @@ window.__ModuleLoader__.load({
         viewLabel: 'Mode',
         tabAuto: 'Auto',
         tabAdvanced: 'Advanced',
-        autoHint: 'The draft is classified automatically, then three candidates are generated from the technique sets and the prompt library. Pick one to write back.',
+        autoHint: 'The draft is classified automatically, then two candidates are offered: a concise pass that keeps your own words, and the best-fitting technique set. Pick one to write back. There is no length level here: each answer is as long as the task needs.',
         autoStart: 'Auto-optimize',
+        autoReady: 'Each candidate writes only as much as the task needs — no padding, and no dropping steps to stay short.',
         autoRunning: 'Auto-optimizing…',
         autoIntent: 'Intent',
         autoPlan: 'Plan',
@@ -212,13 +213,12 @@ window.__ModuleLoader__.load({
         autoUse: 'Use this one',
         autoCopy: 'Copy',
         autoUsed: 'Written back to the composer',
-        autoPickHint: 'Each candidate is tagged with its source (a technique set or a library role).',
+        autoPickHint: 'Each candidate is tagged with its route (concise or best-fit methodology).',
         intentCode: 'code',
         intentCreative: 'creative',
         intentDoc: 'document',
-        routeMethodology: 'Technique route',
-        routeAct: 'Role route',
-        routeStructure: 'Structure route',
+        routeConcise: 'Concise',
+        routeMethodology: 'Best-fit methodology',
         slotWaiting: 'Waiting to run…',
         slotFailed: 'This route failed',
         intentOf: (intent) => (intent === 'code' ? 'Read as code' : intent === 'creative' ? 'Read as creative' : 'Read as a document'),
@@ -243,7 +243,7 @@ window.__ModuleLoader__.load({
     const DEPTH_CHOICES = ['concise', 'default', 'thorough']
     const DEFAULT_DEPTH = 'default'
     const VIEW_CHOICES = ['auto', 'advanced']
-    const PREFS_KEY = 'dsh-prompt-enhance.prefs'
+    const PREFS_KEY = 'dsh-prompt-enhance-ultra.prefs'
 
     /**
      * Vocabulary the host sends as Chinese labels (`/state` → modes/variants/focuses/depths/
@@ -341,9 +341,8 @@ window.__ModuleLoader__.load({
         'prompt-optimizer': { label: { zh: 'Prompt Optimizer', en: 'Prompt Optimizer' } },
       },
       route: {
-        methodology: { label: { zh: '方法论路线', en: 'Technique route' } },
-        act: { label: { zh: '角色路线', en: 'Role route' } },
-        structure: { label: { zh: '结构路线', en: 'Structure route' } },
+        concise: { label: { zh: '简洁优化', en: 'Concise' } },
+        methodology: { label: { zh: '方法论最佳匹配', en: 'Best-fit methodology' } },
       },
     }
 
@@ -555,17 +554,19 @@ window.__ModuleLoader__.load({
 
     const CSS = `
 /* Styling follows DeepSeek Harness docs/web-styling.zh.md: semantic --dsw-alias-* tokens
-   only (no colour literals), 0.5px hairlines for neutral borders, state borders stay 1px,
-   capsule/circle radii pair corner-shape: round, hover behind (hover: hover), and every
-   font-size declares its line-height. The panel is a floating surface: no border, the
-   elevation token draws the stroke. */
+   only (the filled button's white label is the single exception, exactly as the harness
+   does), 0.5px hairlines for neutral borders, state borders stay 1px, capsule/circle radii
+   pair corner-shape: round, hover behind (hover: hover), and every font-size declares its
+   line-height. The panel is a floating surface: no border, the elevation token draws the
+   stroke. Layout uses one 4px rhythm and three radii (8 / 12 / 16) so the panel reads like
+   the surrounding composer instead of a form. */
 .dpe-root { position: relative; display: inline-flex; align-items: center; }
 .dpe-trigger {
-  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px;
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px;
   border-radius: 999px; corner-shape: round; border: 0.5px solid var(--dsw-alias-border-l3);
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-primary);
-  font: inherit; font-size: 12px; line-height: 16px; cursor: pointer; white-space: nowrap;
+  font: inherit; font-size: 12px; line-height: 16px; font-weight: 500; cursor: pointer; white-space: nowrap;
   transition: background-color .15s ease, color .15s ease, border-color .15s ease;
 }
 .dpe-trigger[data-open="true"] {
@@ -578,82 +579,128 @@ window.__ModuleLoader__.load({
 .dpe-icon { width: 14px; height: 14px; flex: none; color: var(--dsw-alias-state-business-primary); }
 
 .dpe-panel {
-  position: fixed; inset: auto; margin: 0; z-index: 60; display: flex; flex-direction: column; gap: 10px;
+  position: fixed; inset: auto; margin: 0; z-index: 60; display: flex; flex-direction: column; gap: 14px;
   box-sizing: border-box;
-  padding: 14px; border: 0; border-radius: var(--dsw-radius-panel, 14px);
+  padding: 16px; border: 0; border-radius: 16px;
   background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary);
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
   box-shadow: var(--dsw-elevation-panel);
   font-size: 13px; line-height: 20px;
   overflow: auto; overscroll-behavior: contain;
-}
-.dpe-head { display: flex; align-items: flex-start; gap: 8px; }
-.dpe-head-main { flex: 1; min-width: 0; }
-.dpe-langs { display: inline-flex; align-items: center; gap: 4px; }
-.dpe-lang { height: 22px; padding: 0 7px; font-size: 11px; line-height: 16px; }
-.dpe-title { font-size: 13px; line-height: 18px; font-weight: 600; color: var(--dsw-alias-label-primary); }
-.dpe-sub { margin-top: 2px; font-size: 11px; line-height: 16px; color: var(--dsw-alias-label-tertiary); }
-.dpe-x {
-  flex: none; width: 22px; height: 22px; border-radius: 6px; border: 0; cursor: pointer;
-  background: transparent; color: var(--dsw-alias-label-tertiary); font-size: 14px; line-height: 14px;
+  scrollbar-width: thin; scrollbar-color: var(--dsw-alias-scrollbar-bg-l2) transparent;
 }
 
-.dpe-tabs { display: flex; gap: 4px; padding: 3px; border-radius: 10px; background: var(--dsw-alias-interactive-bg-hover); }
-.dpe-tab {
-  flex: 1; height: 26px; border: 0; border-radius: 8px; cursor: pointer; background: transparent;
-  color: var(--dsw-alias-label-secondary); font: inherit; font-size: 12px; line-height: 18px;
+/* Sections: a hairline plus breathing room separates "what to build" from "what
+   came back", so the long advanced panel reads as two panels, not one form. */
+.dpe-section {
+  display: flex; flex-direction: column; gap: 12px;
+  padding-top: 14px; border-top: 0.5px solid var(--dsw-alias-border-l1);
 }
-.dpe-tab[data-active="true"] {
-  background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary);
+.dpe-sep { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 0.5px solid var(--dsw-alias-border-l1); }
+.dpe-auto { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.dpe-stack { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.dpe-intro { font-size: 11.5px; line-height: 17px; color: var(--dsw-alias-label-tertiary); }
+.dpe-actions .dpe-cta { flex: 1 1 auto; }
+.dpe-btn.dpe-cta { width: 100%; height: 34px; border-radius: 10px; font-size: 13px; line-height: 18px; }
+.dpe-note > .dpe-btn { align-self: flex-start; }
+
+.dpe-head { display: flex; align-items: center; gap: 10px; }
+.dpe-head-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.dpe-title { font-size: 13.5px; line-height: 20px; font-weight: 600; color: var(--dsw-alias-label-primary); }
+.dpe-sub { font-size: 11.5px; line-height: 16px; color: var(--dsw-alias-label-tertiary); }
+.dpe-langs {
+  display: inline-flex; align-items: center; gap: 2px; flex: none;
+  padding: 2px; border-radius: 999px; corner-shape: round;
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.dpe-langs .dpe-lang {
+  height: 22px; padding: 0 9px; border: 0; border-radius: 999px; corner-shape: round; cursor: pointer;
+  background: transparent; color: var(--dsw-alias-label-tertiary); font: inherit;
+  font-size: 11px; line-height: 16px;
+}
+.dpe-langs .dpe-lang[data-active="true"] {
+  border: 0; background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary);
   box-shadow: var(--dsw-elevation-soft);
 }
+.dpe-x {
+  flex: none; width: 24px; height: 24px; border-radius: 8px; border: 0; cursor: pointer;
+  background: transparent; color: var(--dsw-alias-label-tertiary);
+  font: inherit; font-size: 14px; line-height: 14px;
+}
+.dpe-x:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 1px; }
 
-.dpe-cards { display: flex; flex-direction: column; gap: 6px; }
-.dpe-card {
-  display: flex; gap: 8px; align-items: flex-start; width: 100%; text-align: left; cursor: pointer;
-  padding: 8px 10px; border-radius: 10px; border: 0.5px solid var(--dsw-alias-border-l2);
+/* Two segmented controls, two levels: the view switch picks a workspace, the mode
+   switch picks a family inside the advanced workspace. */
+.dpe-tabs {
+  display: flex; gap: 2px; padding: 3px; border-radius: 12px;
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.dpe-view-tabs { flex: none; }
+.dpe-tab {
+  flex: 1; height: 26px; border: 0; border-radius: 9px; cursor: pointer; background: transparent;
+  color: var(--dsw-alias-label-secondary); font: inherit; font-size: 12px; line-height: 18px;
+  transition: color .15s ease, background-color .15s ease;
+}
+.dpe-tab[data-active="true"] {
+  background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font-weight: 500;
+  box-shadow: var(--dsw-elevation-soft);
+}
+.dpe-tab:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: -1px; }
+
+.dpe-cards { display: flex; flex-direction: column; gap: 8px; }.dpe-card {
+  display: flex; gap: 10px; align-items: flex-start; width: 100%; text-align: left; cursor: pointer;
+  padding: 10px 12px; border-radius: 12px; border: 0.5px solid var(--dsw-alias-border-l2);
   background: transparent; color: inherit; font: inherit;
+  transition: border-color .15s ease, background-color .15s ease;
 }
 .dpe-card[data-active="true"] {
   border: 1px solid var(--dsw-alias-state-business-primary);
   background: var(--dsw-alias-state-business-tertiary);
 }
+.dpe-card:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 1px; }
 .dpe-radio {
-  flex: none; width: 13px; height: 13px; margin-top: 3px;
+  flex: none; width: 14px; height: 14px; margin-top: 2px;
   border-radius: 50%; corner-shape: round; border: 1.5px solid var(--dsw-alias-border-l3);
 }
 .dpe-card[data-active="true"] .dpe-radio { border-color: var(--dsw-alias-state-business-primary); border-width: 4px; }
-.dpe-card-body { min-width: 0; }
+.dpe-card-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .dpe-card-title { font-size: 12.5px; line-height: 18px; font-weight: 500; }
-.dpe-card-hint { margin-top: 2px; font-size: 11px; line-height: 16px; color: var(--dsw-alias-label-tertiary); }
+.dpe-card-hint { font-size: 11.5px; line-height: 17px; color: var(--dsw-alias-label-tertiary); }
 
 .dpe-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.dpe-label { font-size: 11px; line-height: 16px; color: var(--dsw-alias-label-tertiary); }
+.dpe-label { min-width: 36px; font-size: 11.5px; line-height: 16px; color: var(--dsw-alias-label-tertiary); }
 .dpe-check {
-  display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; cursor: pointer;
   border-radius: 999px; corner-shape: round; border: 0.5px solid var(--dsw-alias-border-l2);
   background: transparent; color: var(--dsw-alias-label-secondary); font: inherit;
   font-size: 12px; line-height: 18px;
+  transition: border-color .15s ease, color .15s ease, background-color .15s ease;
 }
 .dpe-check[data-active="true"] {
   border: 1px solid var(--dsw-alias-state-business-primary);
   color: var(--dsw-alias-state-business-primary);
   background: var(--dsw-alias-state-business-tertiary);
 }
+.dpe-check:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 1px; }
 .dpe-select {
-  height: 26px; border-radius: 8px; padding: 0 6px; font: inherit; font-size: 12px; line-height: 18px;
+  height: 28px; border-radius: 8px; padding: 0 8px; font: inherit; font-size: 12px; line-height: 18px;
   border: 0.5px solid var(--dsw-alias-border-l2);
   background: var(--dsw-alias-bg-module-platform); color: inherit;
 }
+.dpe-select:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 1px; }
 
 .dpe-note {
-  padding: 7px 9px; border-radius: 9px; font-size: 11.5px; line-height: 17px;
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 8px 10px; border-radius: 10px; font-size: 11.5px; line-height: 17px;
   border: 0.5px solid var(--dsw-alias-border-l1);
-  background: var(--dsw-alias-interactive-bg-hover);
+  background: var(--dsw-alias-bg-module-platform);
   color: var(--dsw-alias-label-tertiary);
 }
 .dpe-note b { color: var(--dsw-alias-label-secondary); font-weight: 500; }
-.dpe-note-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; line-height: 16px; word-break: break-all; }
+.dpe-note-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px; line-height: 16px; word-break: break-all;
+}
 .dpe-note-error {
   border: 1px solid var(--dsw-alias-state-error-primary);
   color: var(--dsw-alias-state-error-primary);
@@ -661,42 +708,70 @@ window.__ModuleLoader__.load({
 
 .dpe-stream, .dpe-result {
   width: 100%; box-sizing: border-box; min-height: 132px; max-height: 260px; overflow: auto;
-  padding: 9px 10px; border-radius: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 11.5px; line-height: 17.8px; white-space: pre-wrap; word-break: break-word;
+  padding: 10px 12px; border-radius: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px; line-height: 18px; white-space: pre-wrap; word-break: break-word;
   border: 0.5px solid var(--dsw-alias-border-l1);
   background: var(--dsw-alias-bg-module-platform); color: inherit;
+  scrollbar-width: thin; scrollbar-color: var(--dsw-alias-scrollbar-bg-l2) transparent;
 }
-.dpe-result { resize: vertical; min-height: 150px; }
+.dpe-result { resize: vertical; min-height: 150px; max-height: 300px; }
+.dpe-result:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 1px; }
 
-.dpe-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+/* Automatic view: candidate cards stack vertically, and their preview stays
+   short so all three cards stay reachable inside the panel's own scroll. */
+.dpe-auto-candidates { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.dpe-auto-card {
+  flex-direction: column; align-items: stretch; cursor: default;
+  pointer-events: auto; min-width: 0;
+}
+.dpe-auto-card[data-status="running"] { border-color: var(--dsw-alias-border-l3); }
+.dpe-auto-card[data-status="failed"] { opacity: .6; }
+.dpe-auto-text { min-height: 0; max-height: 140px; flex: none; margin: 4px 0 2px; }
+
+.dpe-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .dpe-btn {
   height: 28px; padding: 0 12px; border-radius: 8px; cursor: pointer; font: inherit;
   font-size: 12px; line-height: 18px;
   border: 0.5px solid var(--dsw-alias-border-l2);
   background: transparent; color: var(--dsw-alias-label-secondary);
+  transition: background-color .15s ease, color .15s ease, border-color .15s ease;
 }
+.dpe-btn:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 1px; }
 .dpe-btn:disabled { opacity: .45; cursor: not-allowed; }
 .dpe-btn-primary {
-  border: 0; background: var(--dsw-alias-button-info-fill); color: #fff;
+  height: 30px; padding: 0 14px; border: 0; border-radius: 9px; font-weight: 500;
+  background: var(--dsw-alias-button-info-fill); color: #fff;
 }
 .dpe-btn-danger {
   border: 1px solid var(--dsw-alias-state-error-primary);
   color: var(--dsw-alias-state-error-primary);
 }
 .dpe-spacer { flex: 1; }
-.dpe-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 11px; line-height: 16px; color: var(--dsw-alias-label-tertiary); }
-.dpe-spin { display: inline-block; width: 10px; height: 10px; border-radius: 50%; corner-shape: round; border: 1.5px solid currentColor; border-top-color: transparent; animation: dpe-spin .8s linear infinite; }
+.dpe-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; line-height: 16px; color: var(--dsw-alias-label-tertiary); }
+.dpe-spin {
+  display: inline-block; width: 11px; height: 11px; border-radius: 50%; corner-shape: round;
+  border: 1.5px solid currentColor; border-top-color: transparent; animation: dpe-spin .8s linear infinite;
+}
 @keyframes dpe-spin { to { transform: rotate(360deg); } }
 .dpe-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 @media (hover: hover) {
   .dpe-trigger:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover-solid); color: var(--dsw-alias-label-primary); }
   .dpe-x:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
+  .dpe-lang:hover { color: var(--dsw-alias-label-primary); }
   .dpe-card:hover { border-color: var(--dsw-alias-border-l3); }
   .dpe-card[data-active="true"]:hover { border-color: var(--dsw-alias-state-business-primary); }
+  .dpe-check:hover { border-color: var(--dsw-alias-border-l3); color: var(--dsw-alias-label-primary); }
+  .dpe-check[data-active="true"]:hover { border-color: var(--dsw-alias-state-business-primary); color: var(--dsw-alias-state-business-primary); }
   .dpe-btn:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
   .dpe-btn-primary:hover:not(:disabled) { background: var(--dsw-alias-button-info-hover); color: #fff; }
   .dpe-tab:hover { color: var(--dsw-alias-label-primary); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dpe-spin { animation-duration: 2.4s; }
+  .dpe-trigger, .dpe-card, .dpe-check, .dpe-btn, .dpe-tab { transition: none; }
 }
 `
 
@@ -782,9 +857,18 @@ window.__ModuleLoader__.load({
       const rootRef = useRef(null)
       const triggerRef = useRef(null)
       const panelRef = useRef(null)
+      const autoCandidatesRef = useRef(null)
       const streamRef = useRef(null)
       const abortRef = useRef(null)
       const insertionRef = useRef(null)
+      // Placement is measured at most once per frame; a streaming run freezes
+      // the panel height so the box does not resize under the reader.
+      const placementFrameRef = useRef(0)
+      const frozenHeightRef = useRef(0)
+      // Streaming text is batched per frame: one setState per frame, not one
+      // per delta event.
+      const deltaBufferRef = useRef(new Map())
+      const deltaFrameRef = useRef(0)
 
       const variant = variants[mode] || READY_VARIANT[mode]
 
@@ -923,34 +1007,67 @@ window.__ModuleLoader__.load({
         const rect = node.getBoundingClientRect()
         const viewWidth = window.innerWidth
         const viewHeight = window.innerHeight
+        // The button sits in the composer's control row, so anchoring to it would
+        // drop the panel across the input card. Anchor to the card's top instead.
+        const shellTop = (() => {
+          let element = node.parentElement
+          while (element && element !== document.documentElement) {
+            if (element.querySelector('div[contenteditable="true"]')) {
+              const box = element.getBoundingClientRect()
+              if (box.height >= 60 && box.width >= 200 && box.top < rect.top) return box.top
+            }
+            element = element.parentElement
+          }
+          return rect.top
+        })()
+        const anchorTop = Math.min(rect.top, shellTop)
         // Leave the panel inside the viewport on narrow windows.
         const width = Math.max(240, Math.min(PANEL_WIDTH, viewWidth - PANEL_MARGIN * 2))
-        const left = Math.max(PANEL_MARGIN, Math.min(rect.left, viewWidth - width - PANEL_MARGIN))
+        // Anchor the right edge to the trigger's right edge: the panel then reads
+        // as the button's popover instead of floating somewhere over the page.
+        const left = Math.max(PANEL_MARGIN, Math.min(rect.right - width, viewWidth - width - PANEL_MARGIN))
         const room = viewHeight - PANEL_MARGIN * 2
-        const spaceAbove = rect.top - PANEL_MARGIN * 2
+        const spaceAbove = anchorTop - PANEL_MARGIN * 2
         const spaceBelow = viewHeight - rect.bottom - PANEL_MARGIN * 2
         // How tall the panel wants to be. It scrolls, so `scrollHeight` still
         // reports the full content height while a previous clamp is applied.
         const wanted = panel ? Math.ceil(panel.scrollHeight) : PANEL_MIN_USABLE
-        const height = Math.max(PANEL_MIN_USABLE, Math.min(wanted, room, PANEL_MAX_HEIGHT))
+        // While a run streams, keep the height the panel opened with: letting it
+        // re-fit on every delta resizes the box continuously and hammers layout.
+        const frozen = frozenHeightRef.current
+        const desired = frozen || wanted
+        // Narrow windows get a sheet: there is no room beside or above the composer,
+        // so the panel takes the screen height and scrolls instead of squeezing into
+        // a short window that cuts controls in half.
+        const asSheet = viewWidth < 620
         let next
-        if (height <= spaceAbove) {
-          next = { left, width, bottom: viewHeight - rect.top + PANEL_MARGIN, maxHeight: height }
-        } else if (height <= spaceBelow) {
+        if (asSheet) {
+          const height = Math.max(PANEL_MIN_USABLE, Math.min(desired, room, PANEL_MAX_HEIGHT))
+          next = { left: PANEL_MARGIN, width: viewWidth - PANEL_MARGIN * 2, top: PANEL_MARGIN, maxHeight: height }
+        } else if (spaceAbove >= PANEL_MIN_USABLE) {
+          // Prefer the room above the composer: cap the height to what fits and let
+          // the panel scroll, rather than sliding it up over the input box.
+          const height = Math.max(PANEL_MIN_USABLE, Math.min(desired, spaceAbove, PANEL_MAX_HEIGHT))
+          next = { left, width, bottom: viewHeight - anchorTop + PANEL_MARGIN, maxHeight: height }
+        } else if (spaceBelow >= PANEL_MIN_USABLE) {
+          const height = Math.max(PANEL_MIN_USABLE, Math.min(desired, spaceBelow, PANEL_MAX_HEIGHT))
           next = { left, width, top: rect.bottom + PANEL_MARGIN, maxHeight: height }
         } else {
-          // Neither side has room for the whole panel: slide it up (or down)
-          // until it fits the window instead of shrinking it into a scroll box.
+          // Neither side has room: slide it until it fits the window.
+          const height = Math.max(PANEL_MIN_USABLE, Math.min(desired, room, PANEL_MAX_HEIGHT))
           const above = rect.top - height - PANEL_MARGIN
           const top = Math.min(Math.max(above, PANEL_MARGIN), Math.max(PANEL_MARGIN, viewHeight - height - PANEL_MARGIN))
           next = { left, width, top, maxHeight: height }
         }
         // Never sit on top of the button that opened the panel: when the panel
         // has to overlap the composer, slide it beside the trigger instead.
-        const panelTop = next.top === undefined ? viewHeight - next.bottom - height : next.top
+        const panelTop = next.top === undefined ? viewHeight - next.bottom - next.maxHeight : next.top
         const overlapsTrigger =
-          panelTop + height > rect.top && panelTop < rect.bottom && left + width > rect.left && left < rect.right
-        if (overlapsTrigger) {
+          panelTop + next.maxHeight > rect.top &&
+          panelTop < rect.bottom &&
+          next.left + width > rect.left &&
+          next.left < rect.right
+        if (!asSheet && overlapsTrigger) {
           const besideLeft = rect.left - width - PANEL_MARGIN
           const besideRight = rect.right + PANEL_MARGIN
           if (besideLeft >= PANEL_MARGIN) next.left = besideLeft
@@ -971,6 +1088,21 @@ window.__ModuleLoader__.load({
         })
       }, [])
 
+      // Coalesce measurements into one per animation frame: resize and scroll
+      // fire far faster than the layout needs to be recomputed.
+      const requestPlacement = useCallback(() => {
+        if (placementFrameRef.current) return
+        const raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : null
+        if (!raf) {
+          recomputePlacement()
+          return
+        }
+        placementFrameRef.current = raf(() => {
+          placementFrameRef.current = 0
+          recomputePlacement()
+        })
+      }, [recomputePlacement])
+
       // Layout effect on purpose: the panel is fixed-positioned, so a post-paint
       // `useEffect` measurement would show one frame at the wrong spot.
       useLayoutEffect(() => {
@@ -978,14 +1110,21 @@ window.__ModuleLoader__.load({
           setPlacement(null)
           return undefined
         }
-        recomputePlacement()
-        const onResize = () => recomputePlacement()
+        requestPlacement()
+        const onResize = () => requestPlacement()
         window.addEventListener('resize', onResize)
         window.addEventListener('scroll', onResize, true)
         const visual = window.visualViewport
         if (visual) {
           visual.addEventListener('resize', onResize)
           visual.addEventListener('scroll', onResize)
+        }
+        // A size observer replaces "measure after every render": it only fires
+        // when the content actually changed size, and never per stream delta.
+        let observer = null
+        if (typeof ResizeObserver === 'function' && panelRef.current) {
+          observer = new ResizeObserver(() => requestPlacement())
+          observer.observe(panelRef.current)
         }
         return () => {
           window.removeEventListener('resize', onResize)
@@ -994,20 +1133,38 @@ window.__ModuleLoader__.load({
             visual.removeEventListener('resize', onResize)
             visual.removeEventListener('scroll', onResize)
           }
+          if (observer) observer.disconnect()
         }
-      }, [open, recomputePlacement])
+      }, [open, requestPlacement])
 
-      // Re-measure when the content grows or shrinks (workspace note, stream, result).
+      // Content that arrives without any size change (labels, notes) still needs
+      // one measurement; the frame guard keeps this cheap.
       useEffect(() => {
-        if (open) recomputePlacement()
-      }, [open, catalog, documents, documentsBusy, stage, streamText, result, recomputePlacement])
+        if (open) requestPlacement()
+      }, [open, catalog, documents, documentsBusy, stage, requestPlacement])
 
-      // Async content (workspace note, document list) can also grow without any
-      // of the above changing, so measure after every render; the state guard
-      // inside `recomputePlacement` keeps this from re-rendering in a loop.
+      // Freeze the height for the duration of a run (and release it afterwards).
+      // Without this the panel re-fits on every streamed delta, which resizes the
+      // box continuously and saturates layout — the page then looks frozen.
+      const running = stage === 'running' || autoStage === 'running'
       useLayoutEffect(() => {
-        if (open) recomputePlacement()
-      })
+        if (!open) {
+          frozenHeightRef.current = 0
+          return
+        }
+        if (running) {
+          if (!frozenHeightRef.current) {
+            // Freeze at the tallest the window allows: the panel then opens once
+            // and never resizes per token. `recomputePlacement` still clamps this
+            // to the viewport, so a short window stays inside it.
+            const room = (typeof window === 'undefined' ? 0 : window.innerHeight) - PANEL_MARGIN * 2
+            frozenHeightRef.current = Math.min(PANEL_MAX_HEIGHT, Math.max(room, PANEL_MIN_USABLE))
+          }
+        } else {
+          frozenHeightRef.current = 0
+        }
+        requestPlacement()
+      }, [open, running, requestPlacement])
 
       // The top layer is the only place an ancestor stacking context cannot cover:
       // the composer sits in a `z-index: 1` stack below the hero mask, so a plain
@@ -1051,6 +1208,20 @@ window.__ModuleLoader__.load({
           document.removeEventListener('keydown', onKeyDown, true)
         }
       }, [open])
+
+      // Leftovers: closing the panel or switching view must not leave an old
+      // error or toast behind for the next open.
+      useEffect(() => {
+        if (open) return
+        setNotice('')
+        setError('')
+        setAutoError('')
+      }, [open])
+
+      useEffect(() => {
+        setError('')
+        setAutoError('')
+      }, [view, mode])
 
       useEffect(() => {
         if (streamRef.current) streamRef.current.scrollTop = streamRef.current.scrollHeight
@@ -1109,6 +1280,9 @@ window.__ModuleLoader__.load({
         const controller = new AbortController()
         abortRef.current = controller
         let settled = false
+        // Streamed text is applied once per frame, not once per delta.
+        let pendingAdvanced = ''
+        let advancedFrame = 0
         const body = {
           prompt,
           mode,
@@ -1125,21 +1299,44 @@ window.__ModuleLoader__.load({
           await streamEnhance(
             body,
             {
-              onMeta: (payload) => setMeta(payload || null),
-              onStatus: (payload) => setProgress(payload || null),
-              onDelta: (payload) => {
+              // `streamSse` dispatches by event name, so the handler keys must be
+              // the SSE event names themselves — `onDelta`-style keys never fire
+              // and the panel then looks frozen while a run is going.
+              meta: (payload) => setMeta(payload || null),
+              status: (payload) => setProgress(payload || null),
+              delta: (payload) => {
                 const piece = payload && typeof payload.text === 'string' ? payload.text : ''
-                if (piece) setStreamText((previous) => previous + piece)
+                if (!piece) return
+                pendingAdvanced += piece
+                if (advancedFrame) return
+                const raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : null
+                const flushAdvanced = () => {
+                  advancedFrame = 0
+                  if (!pendingAdvanced) return
+                  const chunk = pendingAdvanced
+                  pendingAdvanced = ''
+                  setStreamText((previous) => previous + chunk)
+                }
+                if (!raf) {
+                  flushAdvanced()
+                  return
+                }
+                advancedFrame = raf(flushAdvanced)
               },
-              onDone: (payload) => {
+              done: (payload) => {
                 settled = true
+                if (advancedFrame && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(advancedFrame)
+                advancedFrame = 0
+                const tail = pendingAdvanced
+                pendingAdvanced = ''
                 const text = payload && typeof payload.text === 'string' ? payload.text : ''
+                if (tail && !text) setStreamText((previous) => previous + tail)
                 setResult(text)
                 setMeta((previous) => ({ ...(previous || {}), ...(payload && payload.usage ? { usage: payload.usage } : {}), durationMs: payload && payload.durationMs }))
                 setStage(text ? 'done' : 'error')
                 if (!text) setError(LABELS.emptyResult)
               },
-              onError: (payload) => {
+              error: (payload) => {
                 settled = true
                 setError((payload && payload.message) || LABELS.enhanceFailed)
                 setStage('error')
@@ -1206,14 +1403,38 @@ window.__ModuleLoader__.load({
         setAutoMeta(null)
         setProgress(null)
         insertionRef.current = captureInsertion()
-        beat('auto-start', `${depth}`)
+        beat('auto-start', 'length:auto')
 
         const controller = new AbortController()
         abortRef.current = controller
         let settled = false
+
+        // Apply whatever the delta buffer still holds, right now: a finished
+        // route must never lose its tail to a cancelled animation frame.
+        const flushDeltas = () => {
+          if (deltaFrameRef.current && typeof cancelAnimationFrame === 'function') {
+            cancelAnimationFrame(deltaFrameRef.current)
+          }
+          deltaFrameRef.current = 0
+          const pending = deltaBufferRef.current
+          if (!pending.size) return
+          const batch = Array.from(pending.entries())
+          pending.clear()
+          setAutoSlots((previous) => {
+            const next = previous.slice()
+            for (const [target, text] of batch) {
+              const index = next.findIndex((item) => item.slot === target)
+              if (index === -1) {
+                next.push({ slot: target, route: '', label: '', reason: '', text, status: 'running' })
+              } else {
+                next[index] = { ...next[index], text: `${next[index].text}${text}` }
+              }
+            }
+            return next
+          })
+        }
         const body = {
           prompt,
-          depth,
           ...(sessionCwd ? { cwd: sessionCwd } : {}),
           ...(sessionId ? { sessionId } : {}),
         }
@@ -1232,18 +1453,20 @@ window.__ModuleLoader__.load({
                 const slot = payload && typeof payload.slot === 'number' ? payload.slot : 0
                 const piece = payload && typeof payload.text === 'string' ? payload.text : ''
                 if (!piece) return
-                setAutoSlots((previous) => {
-                  const next = previous.slice()
-                  let record = next.find((item) => item.slot === slot)
-                  if (!record) {
-                    record = { slot, route: '', label: '', reason: '', text: '', status: 'running' }
-                    next.push(record)
-                  }
-                  record.text += piece
-                  return next
-                })
+                // Batch per frame: three routes can stream hundreds of deltas a
+                // second, and one render per delta stalls the whole page.
+                const buffer = deltaBufferRef.current
+                buffer.set(slot, (buffer.get(slot) || '') + piece)
+                if (deltaFrameRef.current) return
+                const raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : null
+                if (!raf) {
+                  flushDeltas()
+                  return
+                }
+                deltaFrameRef.current = raf(flushDeltas)
               },
               'slot-error': (payload) => {
+                flushDeltas()
                 const slot = payload && typeof payload.slot === 'number' ? payload.slot : 0
                 setAutoSlots((previous) => {
                   const next = previous.slice()
@@ -1257,6 +1480,7 @@ window.__ModuleLoader__.load({
                 })
               },
               'slot-done': (payload) => {
+                flushDeltas()
                 const slot = payload && typeof payload.slot === 'number' ? payload.slot : 0
                 setAutoSlots((previous) => {
                   const next = previous.slice()
@@ -1267,6 +1491,7 @@ window.__ModuleLoader__.load({
               },
               done: (payload) => {
                 settled = true
+                flushDeltas()
                 const slots = payload && Array.isArray(payload.slots) ? payload.slots : []
                 setAutoSlots(
                   slots.map((item) => ({
@@ -1283,14 +1508,24 @@ window.__ModuleLoader__.load({
                   ...(previous || {}),
                   intent: payload && payload.intent,
                   intentSummary: payload && payload.intentSummary,
-                  depth: payload && payload.depth,
                   durationMs: payload && payload.durationMs,
                 }))
                 setProgress(null)
                 setAutoStage('done')
+                // The candidates sit below the stream box; bring them into view so the
+                // result is not hidden behind the panel's own scroll area.
+                if (typeof requestAnimationFrame === 'function') {
+                  requestAnimationFrame(() => {
+                    const block = autoCandidatesRef.current
+                    if (block && typeof block.scrollIntoView === 'function') {
+                      block.scrollIntoView({ block: 'nearest' })
+                    }
+                  })
+                }
               },
               error: (payload) => {
                 settled = true
+                flushDeltas()
                 setAutoError((payload && payload.message) || LABELS.autoFailed)
                 setAutoStage('error')
               },
@@ -1396,7 +1631,12 @@ window.__ModuleLoader__.load({
           if (!value) return
           if (writeDraft(value)) {
             setNotice(LABELS.autoUsed)
-            window.setTimeout(() => setNotice(''), 1600)
+            // The panel closes right away, so this timer may fire after the
+            // component unmounted — a stale setState is a harmless no-op,
+            // but guard it anyway to keep the console clean.
+            window.setTimeout(() => {
+              setNotice((previous) => (previous === LABELS.autoUsed ? '' : previous))
+            }, 1600)
             setOpen(false)
           }
         },
@@ -1759,12 +1999,15 @@ window.__ModuleLoader__.load({
         const autoCandidates = autoSlots.length
           ? h(
               'div',
-              { className: 'dpe-auto-candidates' },
+              { className: 'dpe-auto-candidates', ref: autoCandidatesRef },
               h('div', { className: 'dpe-label' }, LABELS.autoCandidates),
               h('div', { className: 'dpe-label dpe-sub' }, LABELS.autoPickHint),
               ...autoSlots.map((item) => {
                 const routeLabel = item.route ? w('route', item.route) || item.route : item.route
                 const label = item.label || routeLabel
+                // The concise route has no technique name of its own, so its label equals the
+                // route label — print it once instead of "简洁优化 · 简洁优化".
+                const title = !routeLabel || label === routeLabel ? label : `${routeLabel} · ${label}`
                 const statusText =
                   item.status === 'running'
                     ? LABELS.autoRunning
@@ -1777,7 +2020,7 @@ window.__ModuleLoader__.load({
                   h(
                     'div',
                     { className: 'dpe-card-title' },
-                    `${routeLabel ? `${routeLabel} · ` : ''}${label}`,
+                    title,
                   ),
                   item.reason ? h('div', { className: 'dpe-card-hint' }, item.reason) : null,
                   h('div', { className: 'dpe-stream dpe-auto-text' }, item.text || statusText || LABELS.slotWaiting),
@@ -1810,41 +2053,48 @@ window.__ModuleLoader__.load({
             )
           : null
 
+        // Also used by the auto view: declare before the views are built, or the
+        // running branch hits the temporal dead zone and the whole slot crashes.
+        const reasoningChars = progress && progress.stage === 'reasoning' ? Number(progress.chars || 0) : 0
+        const runningHint = reasoningChars > 0 ? `${LABELS.thinking}…${LABELS.reasoningSuffix(reasoningChars)}` : LABELS.running
+
         const autoBody = h(
           'div',
-          null,
-          h('div', { className: 'dpe-label dpe-sub' }, LABELS.autoHint),
+          { className: 'dpe-auto' },
+          h('div', { className: 'dpe-intro' }, LABELS.autoHint),
           autoStage === 'running'
             ? h(
                 'div',
-                null,
+                { className: 'dpe-stack' },
                 h('div', { className: 'dpe-stream', ref: streamRef }, runningHint),
                 h(
                   'div',
-                  { className: 'dpe-actions', style: { marginTop: '8px' } },
+                  { className: 'dpe-actions' },
                   h('button', { type: 'button', className: 'dpe-btn dpe-btn-danger', onClick: stop }, LABELS.stop),
                   h('span', { className: 'dpe-label' }, LABELS.streamHint),
                 ),
               )
             : h(
                 'div',
-                { className: 'dpe-actions' },
+                { className: 'dpe-stack' },
                 h(
                   'button',
                   {
                     type: 'button',
-                    className: 'dpe-btn dpe-btn-primary',
+                    className: 'dpe-btn dpe-btn-primary dpe-cta',
                     disabled: !trimmedDraft,
                     onClick: startAuto,
                   },
                   LABELS.autoStart,
                 ),
-                h('span', { className: 'dpe-label' }, trimmedDraft ? LABELS.readyHint : LABELS.emptyDraft),
+                h('div', { className: 'dpe-intro' }, trimmedDraft ? LABELS.autoReady : LABELS.emptyDraft),
               ),
           autoNoticeLine,
-          autoCandidates,
-          autoStage === 'idle' && autoError ? autoErrorNote : null,
-          depthRow,
+          autoCandidates ? h('div', { className: 'dpe-sep' }, autoCandidates) : null,
+          autoError && (autoStage === 'idle' || autoStage === 'error') ? autoErrorNote : null,
+          autoStage !== 'running' && autoSlots.length && !autoSlots.some((item) => item.text)
+            ? h('div', { className: 'dpe-note dpe-note-error' }, LABELS.errorPrefix, LABELS.emptyResult)
+            : null,
         )
 
         const metaLine = meta
@@ -1865,9 +2115,6 @@ window.__ModuleLoader__.load({
               wantsDocument && meta.documentHeadings ? h('span', null, LABELS.documentHeadings(meta.documentHeadings)) : null,
             )
           : null
-
-        const reasoningChars = progress && progress.stage === 'reasoning' ? Number(progress.chars || 0) : 0
-        const runningHint = reasoningChars > 0 ? `${LABELS.thinking}…${LABELS.reasoningSuffix(reasoningChars)}` : LABELS.running
 
         let body = null
         if (stage === 'running') {          body = h(
@@ -1944,15 +2191,28 @@ window.__ModuleLoader__.load({
             style: panelStyle,
           },
           head,
-          catalogError ? errorNote : null,
           viewTabs,
-          view === 'auto' ? autoBody : [tabs, cards, focusRow, depthRow, methodRow, workspaceNote, documentNote],
-          view === 'advanced' && stage === 'idle' && error ? errorNote : null,
-          view === 'advanced' ? body : null,
+          view === 'auto'
+            ? autoBody
+            : h(
+                'div',
+                { className: 'dpe-section' },
+                tabs,
+                cards,
+                focusRow,
+                depthRow,
+                methodRow,
+                workspaceNote,
+                documentNote,
+                catalogError ? errorNote : null,
+                stage === 'idle' && error ? errorNote : null,
+              ),
+          view === 'advanced' ? h('div', { className: 'dpe-section' }, body) : null,
         )
       }
 
       const triggerDisabled = stage === 'running' && !open
+      const autoRunning = autoStage === 'running'
 
       return h(
         'div',
@@ -1967,9 +2227,13 @@ window.__ModuleLoader__.load({
             'data-open': open ? 'true' : 'false',
             'aria-haspopup': 'dialog',
             'aria-expanded': open ? 'true' : 'false',
-            disabled: triggerDisabled,
+            disabled: triggerDisabled || (autoRunning && open),
             title: trimmedDraft ? LABELS.triggerHint : `${LABELS.triggerHint}（${LABELS.emptyDraft}）`,
             onClick: () => {
+              // While candidates are streaming and the panel is open, an
+              // accidental second click must not close the panel over the
+              // user's head (it looked like "everything disappeared").
+              if (autoRunning && open) return
               const next = !open
               setOpen(next)
               if (next && !catalog && !catalogError) loadCatalog()
@@ -1977,7 +2241,7 @@ window.__ModuleLoader__.load({
           },
           h(SparkIcon),
           h('span', null, LABELS.trigger),
-          stage === 'running' ? h('span', { className: 'dpe-spin', 'aria-hidden': 'true' }) : null,
+          stage === 'running' || autoRunning ? h('span', { className: 'dpe-spin', 'aria-hidden': 'true' }) : null,
         ),
         open ? renderPanel() : null,
       )
@@ -1990,7 +2254,7 @@ window.__ModuleLoader__.load({
     return {
       inject: ['slots'],
       apply(ctx) {
-        beat('client-apply', 'v1.5.0')
+        beat('client-apply', 'v1.6.0')
         // Follow DeepSeek Harness on first run; an explicit choice overrides it.
         try {
           const locale = typeof ctx.get === 'function' ? ctx.get('locale') : null
@@ -2003,7 +2267,7 @@ window.__ModuleLoader__.load({
         }
         ctx.slots.inject('conversation.input.right', () =>
           ctx.slots.register(
-            { name: 'conversation.input.right', id: 'prompt-enhance-trigger', order: 20 },
+            { name: 'conversation.input.right', id: 'prompt-enhance-ultra-trigger', order: 20 },
             PromptEnhanceDock,
           ),
         )

@@ -13,6 +13,11 @@ import {
   DEPTHS,
   DEPTH_IDS,
   METHODOLOGY_LENGTH,
+  AUTO_LENGTH_RULE,
+  AUTO_ROUTES,
+  CONCISE_LENGTH_RULE,
+  buildAutoPrompt,
+  buildConcisePrompt,
   docOutputRule,
   depthBudget,
   methodologyById,
@@ -395,5 +400,66 @@ test('the document budget follows the same yardstick', () => {
     assert.ok(system.includes(`整体不超过 ${budget} 字`), `${depth} should quote its own document budget`)
     assert.ok(system.includes(docOutputRule(budget)))
   }
+})
+
+test('the automatic mode decides its own length instead of quoting a budget', () => {
+  const promptText = '给桌面小工具加批量重命名：选择文件夹、按日期改名、可撤销'
+
+  for (const methodologyId of ['superpower', 'langgpt', 'prompt-optimizer', 'aishort']) {
+    for (const intent of ['code', 'creative', 'doc']) {
+      const system = buildAutoPrompt({ promptText, intent, route: 'methodology', methodology: methodologyById(methodologyId) })
+      assert.ok(system.includes(AUTO_LENGTH_RULE), `${methodologyId}/${intent} carries the length rule`)
+      assert.equal(/篇幅档位/.test(system), false, `${methodologyId}/${intent} quotes no band name`)
+      assert.equal(/硬上限 \d+ 字/.test(system), false, `${methodologyId}/${intent} quotes no hard budget`)
+      assert.equal(/整体不超过 \d+ 字/.test(system), false, `${methodologyId}/${intent} quotes no document budget`)
+    }
+  }
+
+  // A document candidate still keeps the document-specific constraints, minus the number.
+  const docSystem = buildAutoPrompt({ promptText, intent: 'doc', route: 'methodology', methodology: methodologyById('langgpt') })
+  assert.ok(docSystem.includes('保留原文档的标题层级、编号与表格列'))
+  assert.ok(docSystem.includes('宁可按小节分批补写'))
+})
+
+test('the concise route keeps the words and hands back one finished prompt', () => {
+  const promptText = '把周报改得简洁一点，周四之前给老板'
+  const system = buildConcisePrompt({ promptText, intent: 'creative' })
+
+  // The method: verbatim user words, subordinate additions, no invented rules.
+  assert.ok(system.includes('只加不改'))
+  assert.ok(system.includes('原话逐字保留'))
+  assert.ok(system.includes('不得新增原话里没有的'))
+  assert.ok(system.includes('{{待填写：名称｜格式示例}}'))
+  assert.ok(system.includes('不解释、不举例、不复述用户的要求清单'))
+  assert.ok(system.includes('创作类'), 'the intent hint reaches the prompt')
+  assert.ok(system.includes(CONCISE_LENGTH_RULE))
+  assert.ok(system.includes(`用户原提示词语言：${'中文'}`), 'the language line is kept')
+
+  // One complete prompt, not a filled-in template: no section label ever stands alone.
+  assert.ok(system.includes('不要出现任何模板小标题'))
+  const lines = system.split('\n').map((line) => line.trim())
+  for (const label of ['任务：', '用户原话（按此执行）：', '材料：', '补充说明：']) {
+    assert.equal(lines.includes(label), false, `template label stands alone: ${label}`)
+  }
+
+  // It is a different animal from the methodology route: no technique fragment, no depth budget.
+  assert.equal(/方法论（/.test(system), false)
+  assert.equal(/硬上限 \d+ 字/.test(system), false)
+  assert.equal(/篇幅档位/.test(system), false)
+
+  // The per-intent hint changes with the recognized class.
+  assert.ok(buildConcisePrompt({ promptText, intent: 'code' }).includes('代码类'))
+  assert.ok(buildConcisePrompt({ promptText, intent: 'doc' }).includes('文档类'))
+
+  // The auto router sends the concise route to that builder and nothing else.
+  assert.equal(buildAutoPrompt({ promptText, intent: 'code', route: 'concise' }), buildConcisePrompt({ promptText, intent: 'code' }))
+})
+
+test('the automatic mode offers exactly two routes', () => {
+  assert.deepEqual(
+    AUTO_ROUTES.map((route) => route.id),
+    ['concise', 'methodology'],
+  )
+  for (const route of AUTO_ROUTES) assert.ok(route.label && route.labelEn && route.hint, 'routes are documented')
 })
 

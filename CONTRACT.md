@@ -1,4 +1,4 @@
-# dsh-prompt-enhance — internal contract
+# dsh-prompt-enhance-ultra — internal contract
 
 Single source of truth shared by the host half (`index.js`, `strategies.js`) and the
 browser half (`client.js`). Both halves live in one bundle package; the host serves the
@@ -6,9 +6,9 @@ HTTP API and the client renders the composer control-row UI.
 
 ## Identity
 
-- package name / client module id: `dsh-prompt-enhance`
-- host route prefix: `/prompt-enhance/api`
-- cordis row id: `prompt-enhance`
+- package name / client module id: `dsh-prompt-enhance-ultra`
+- host route prefix: `/prompt-enhance-ultra/api`
+- cordis row id: `prompt-enhance-ultra`
 
 ## Vocabulary
 
@@ -83,17 +83,17 @@ with an appropriate status. The route sits outside the harness `/api/*` auth mid
 so every write must be guarded by loopback + same-origin + JSON content-type checks
 (same three gates as `dsh-workbuddy2api-hub`).
 
-### `GET /prompt-enhance/api/state`
+### `GET /prompt-enhance-ultra/api/state`
 
 ```json
 {
   "ok": true,
-  "version": "1.5.0",
+  "version": "1.6.0",
   "provider": "workbuddy2api-hub",
   "model": "deepseek-v4.1-flash",
   "modelSource": "session-default",
   "workspace": { "root": "C:\\...\\default-workspace", "source": "config|registry|session|cwd" },
-  "limits": { "maxPromptChars": 12000, "maxWorkspaceFiles": 40, "maxWorkspaceBytes": 60000, "maxExcerptChars": 3500, "maxScanFiles": 60, "maxScannedBytes": 921600, "maxListedDocuments": 800, "maxDocumentChars": 16000 },
+  "limits": { "maxPromptChars": 12000, "maxWorkspaceFiles": 40, "maxWorkspaceBytes": 60000, "maxExcerptChars": 3500, "maxScanFiles": 60, "maxScannedBytes": 921600, "maxListedDocuments": 800, "maxDocumentChars": 16000, "maxOutputTokens": 8000, "callTimeoutMs": 120000, "requestTimeoutMs": 420000 },
   "modes": [
     { "id": "code", "label": "代码", "variants": [
         { "id": "code-read", "label": "读取工作区后优化", "hint": "先扫描工作区再改写" },
@@ -121,11 +121,7 @@ so every write must be guarded by loopback + same-origin + JSON content-type che
     { "id": "aishort", "label": "AiShort 提示词库", "hint": "…", "source": "…", "license": "MIT", "principles": ["…"] },
     { "id": "prompt-optimizer", "label": "Prompt Optimizer", "hint": "…", "source": "…", "license": "unknown", "principles": ["…"] }
   ],
-  "acts": [
-    { "id": "act-screenwriter", "zh": "编剧", "en": "Screenwriter", "applies": ["creative"] },
-    { "id": "act-security-auditor", "zh": "安全审计师", "en": "Cyber Security Specialist", "applies": ["code"] }
-  ],
-  "routes": ["methodology", "act", "structure"],
+  "routes": ["concise", "methodology"],
   "client": { "beats": 3, "recent": [{ "at": 1761, "event": "dock-mounted", "detail": "hooks-ok" }] }
 }
 ```
@@ -137,7 +133,7 @@ confirm the UI actually mounted without a browser console. It never influences e
 `model` may be empty when no provider is resolvable; the client must then show a
 readable hint and still let the user open the panel.
 
-### `GET /prompt-enhance/api/workspace?refresh=1&cwd=…`
+### `GET /prompt-enhance-ultra/api/workspace?refresh=1&cwd=…`
 
 Scans the workspace (bounded) and returns the preview plus static security findings.
 `cwd` is the absolute directory the browser thinks the session lives in; it wins over the
@@ -152,7 +148,7 @@ configured/registry root when it is an existing directory (`source: "session"`).
   "fileCount": 173,
   "totalBytes": 481230,
   "truncated": false,
-  "files": ["prompt-enhance/index.js", "src/app.ts"],
+  "files": ["prompt-enhance-ultra/index.js", "src/app.ts"],
   "ignored": ["node_modules", ".git", "dist"],
   "security": {
     "findings": [
@@ -164,7 +160,7 @@ configured/registry root when it is an existing directory (`source: "session"`).
 }
 ```
 
-### `GET /prompt-enhance/api/documents?refresh=1&cwd=…&prompt=…&path=…`
+### `GET /prompt-enhance-ultra/api/documents?refresh=1&cwd=…&prompt=…&path=…`
 
 Lists the readable documents of the workspace and outlines the one that would be read.
 `cwd` has the same meaning as on `/workspace`. `prompt` (≤240 chars) steers the ranking;
@@ -182,15 +178,15 @@ model hit `maxDocumentChars`.
   "requested": "",
   "total": 61,
   "documents": [
-    { "path": "prompt-enhance/README.md", "chars": 11340, "truncated": false, "headings": 27, "score": 3.2, "modifiedAt": 1761 }
+    { "path": "prompt-enhance-ultra/README.md", "chars": 11340, "truncated": false, "headings": 27, "score": 3.2, "modifiedAt": 1761 }
   ],
   "selected": {
-    "path": "prompt-enhance/README.md",
+    "path": "prompt-enhance-ultra/README.md",
     "chars": 11340,
     "lines": 305,
     "headings": 27,
     "truncated": false,
-    "outline": [{ "level": 1, "text": "dsh-prompt-enhance", "line": 1 }],
+    "outline": [{ "level": 1, "text": "dsh-prompt-enhance-ultra", "line": 1 }],
     "format": { "headingStyle": "Markdown ATX（#）", "maxDepth": 3, "tables": 7, "codeBlocks": 8, "orderedLists": 10, "unorderedLists": 59, "links": 46, "bold": 37, "frontMatter": false, "numbering": "1. / 1.1", "avgParagraph": 136 }
   },
   "durationMs": 14
@@ -200,7 +196,7 @@ model hit `maxDocumentChars`.
 `selected` is `null` when nothing readable was found; the client then shows
 「未找到可读文档」 and blocks `doc-fill` (the user can still switch to `doc-draft`).
 
-### `POST /prompt-enhance/api/enhance` — `text/event-stream`
+### `POST /prompt-enhance-ultra/api/enhance` — `text/event-stream`
 
 Request body:
 
@@ -212,7 +208,7 @@ Request body:
   "focus": [],
   "depth": "concise",
   "methodology": "auto",
-  "docPath": "prompt-enhance/README.md",
+  "docPath": "prompt-enhance-ultra/README.md",
   "cwd": "C:\\optional\\absolute\\path",
   "sessionId": "optional-session-id"
 }
@@ -244,53 +240,58 @@ Validation error codes: `empty-prompt` (400), `prompt-too-long` (413), `bad-mode
 
 The host aborts the model call when the HTTP request closes.
 
-### `POST /prompt-enhance/api/candidates` — `text/event-stream`
+### `POST /prompt-enhance-ultra/api/candidates` — `text/event-stream`
 
 The automatic mode. The body only needs the draft:
 
 ```json
 {
   "prompt": "写一个雨夜咖啡馆的短片剧本",
-  "depth": "default",
   "cwd": "C:\\optional\\absolute\\path",
   "sessionId": "optional-session-id"
 }
 ```
 
-The host first recognizes the intent with one small LLM call (max 400 tokens, 30 s
-deadline). The model is asked for `{"intent":"code|creative|doc","summary","keywords"}`;
-when the answer is not parseable JSON the host falls back to a keyword heuristic and
-labels the intent `source: "heuristic"`. It then plans three candidates and generates
-them sequentially, each as its own `/enhance`-style stream with a route-tagged system
-prompt:
+There is deliberately **no `depth`** here: the candidates decide how long their answer
+should be from the task itself, so the system prompt carries a length *policy*
+(「篇幅要求：不设档位，按任务本身判断该写多长」) instead of a character budget. A stray
+`depth` field is ignored — the mode never honours it and never rejects it.
 
-- slot 0 `methodology` — the top methodology from `selectMethodology` for the intent;
-- slot 1 `act` — one act role from `ACT_ROLES` (techniques distilled from f/prompts.chat's
-  act cards, CC BY-NC: only the technique, never card text) plus the secondary methodology;
-- slot 2 `structure` — the secondary methodology, i.e. the same recognized intent written
-  with a different structured house style.
+The host first recognizes the intent with one small LLM call (max 400 tokens, capped by
+`callTimeoutMs`). The model is asked for `{"intent":"code|creative|doc","summary","keywords"}`;
+when the answer is not parseable JSON the host falls back to a keyword heuristic and
+labels the intent `source: "heuristic"`. It then plans two candidates and generates
+them sequentially, each as its own `/enhance`-style stream with its own system prompt:
+
+- slot 0 `concise` — "your words, one finished prompt": the draft is kept verbatim as the spine and
+  the execution notes are appended into the same prompt, so the answer is a single ready-to-paste
+  prompt rather than a filled-in template (no `任务：` / `用户原话（按此执行）：` / `补充说明：` section
+  labels). Technique from Samuel-Shek/prompt-optimizer-skill, MIT; text rewritten here, nothing
+  copied. It never invents bans, counts, orderings or acceptance criteria the user did not ask for,
+  and gaps stay as `{{待填写：名称｜格式示例}}` placeholders.
+- slot 1 `methodology` — the top methodology from `selectMethodology` for the intent,
+  carrying its structure and writing requirements.
 
 Events (same transport rules as `/enhance`, plus):
 
 | event | data |
 | --- | --- |
-| `meta` | `{ provider, model, modelSource, promptChars, depth, routes: ["methodology","act","structure"], stage: "intent", startedAt }` |
-| `status` | `{ stage: "intent", intent, summary, keywords, source: "model"|"heuristic" }`, `{ stage: "plan", intent, candidates: [{slot, route, label, reason}] }`, `{ stage: "generating", slot, route }`, reasoning/text per slot |
+| `meta` | `{ provider, model, modelSource, promptChars, routes: ["concise","methodology"], stage: "intent", startedAt }` |
+| `status` | `{ stage: "intent", intent, summary, keywords, source: "model"|"heuristic" }` (plus `degraded: reason` when the model pass failed and the heuristic took over), `{ stage: "plan", intent, candidates: [{slot, route, label, reason}] }`, `{ stage: "generating", slot, route }`, reasoning/text per slot |
 | `delta` | `{ slot, text }` |
-| `slot-error` | `{ slot, code: "upstream-failed"|"empty-result", message }` — the remaining routes still run |
+| `slot-error` | `{ slot, code: "upstream-failed"|"empty-result", message }` — timeouts are per route (`callTimeoutMs`, default 120 s), so the other route still runs; the whole run only ends via the run-level `requestTimeoutMs` (default 420 s) or a client abort |
 | `slot-done` | `{ slot, chars, finish }` |
-| `done` | `{ intent, intentSummary, depth, slots: [{slot, route, label, labelEn, reason, text, finish}], durationMs }` |
-| `error` | `{ code, message }` — only when every route failed |
+| `done` | `{ intent, intentSummary, slots: [{slot, route, label, labelEn, reason, text, finish}], durationMs }` |
+| `error` | `{ code, message }` — only when both routes failed |
 
-Validation error codes: `empty-prompt` (400), `prompt-too-long` (413), `bad-depth` (400),
-`no-model` (503).
+Validation error codes: `empty-prompt` (400), `prompt-too-long` (413), `no-model` (503).
 
-### `POST /prompt-enhance/api/cancel`
+### `POST /prompt-enhance-ultra/api/cancel`
 
 Optional `{}` body; aborts the newest in-flight enhancement of that process. Not required
 by the UI (the client aborts its fetch instead) but useful for debugging.
 
-### `POST /prompt-enhance/api/presence`
+### `POST /prompt-enhance-ultra/api/presence`
 
 Diagnostic only: `{ "event": "dock-mounted", "detail": "hooks-ok" }` appends one breadcrumb
 to the in-memory ring (24 entries) that `GET /state` echoes under `client`. The client calls
@@ -298,9 +299,9 @@ it with `keepalive: true` and ignores failures.
 
 ## Client responsibilities (`client.js`)
 
-`window.__ModuleLoader__.load({ id: 'dsh-prompt-enhance', factory(require) { ... } })`,
+`window.__ModuleLoader__.load({ id: 'dsh-prompt-enhance-ultra', factory(require) { ... } })`,
 factory returns `{ inject: ['slots'], apply(ctx) { ... } }` and registers one component on
-`conversation.input.right` with `{ name: 'conversation.input.right', id: 'prompt-enhance-trigger', order: 20 }`.
+`conversation.input.right` with `{ name: 'conversation.input.right', id: 'prompt-enhance-ultra-trigger', order: 20 }`.
 That slot is the composer control row and renders for both the hero composer and an active
 session, unlike `conversation.composer.dock`, which is hidden in some composer variants.
 
@@ -324,17 +325,18 @@ UI requirements:
    of width). Inside it:
 
    - 代码 / 创作 / 文档 tab switch.
-   - A top view switch `自动 | 高级` above them: the default `自动` view streams three
-     route-tagged candidates from `POST /candidates` (methodology / act / structure), each
+   - A top view switch `自动 | 高级` above them: the default `自动` view streams two
+     route-tagged candidates from `POST /candidates` (concise / methodology), each
      card showing its route label, the reason and a `使用这组` + `复制` action; the `高级`
      view is the full manual panel described below. The chosen view is remembered as `view`
-     in `dsh-prompt-enhance.prefs` (default `auto`).
+     in `dsh-prompt-enhance-ultra.prefs` (default `auto`).
    - Variant cards (radio behaviour) per the vocabulary above; the last choice per family is
-     remembered in `localStorage` under `dsh-prompt-enhance.prefs` (panel choices only, never
+     remembered in `localStorage` under `dsh-prompt-enhance-ultra.prefs` (panel choices only, never
      the draft text).
    - Code mode: focus checkboxes (`framework`, `security`), at least one required.
-   - Depth chips (`简洁` / `默认` / `严谨`) for every mode, with the current level's hint on the
-     right; the last level is remembered like the other panel choices.
+   - Depth chips (`简洁` / `默认` / `严谨`) in the **advanced** view only, with the current level's
+     hint on the right; the last level is remembered like the other panel choices. The automatic
+     view has no level: each candidate is as long as its task needs.
    - Methodology select (`auto` first) with the hint text.
    - Workspace preview line for `code-read`: file count + "预览/刷新" that calls the
      workspace endpoint and shows the first few paths.
@@ -347,7 +349,7 @@ UI requirements:
      start when `span.draftRev === currentDraftRev`), `复制`, `再试一次`.
    - Language chips (`中文` / `English`) in the panel header, right of the title. Clicking one
      switches every string in the panel immediately (no reload) and stores the choice as `lang`
-     in `dsh-prompt-enhance.prefs`. The first run without a stored choice follows the harness
+     in `dsh-prompt-enhance-ultra.prefs`. The first run without a stored choice follows the harness
      language via `ctx.get('locale')?.getLocale?.().active` (English harness → English), and the
      locale service stays an optional dependency — `inject` remains `['slots']`.
 3. Never read another plugin's DOM, never touch `document.body`, never install a global

@@ -9,8 +9,8 @@ The plugin has **zero runtime dependencies** and does not need a build step. You
 installed and a profile you can edit.
 
 ```bash
-git clone https://github.com/EasonQuantico/dsh-prompt-enhance.git
-cd dsh-prompt-enhance
+git clone https://github.com/EasonQuantico/dsh-prompt-enhance-ultra.git
+cd dsh-prompt-enhance-ultra
 npm run verify          # node --check on all sources + node --test test/
 ```
 
@@ -19,12 +19,12 @@ To load your checkout into a running DSH, point the profile at it (adapt the pat
 ```jsonc
 // ~/.dsh/profiles/<profile>/package.json
 {
-  "dependencies": { "dsh-prompt-enhance": "file:/absolute/path/to/your/checkout" },
-  "dsh": { "profile": { "bundles": ["...", "dsh-prompt-enhance"] } }
+  "dependencies": { "dsh-prompt-enhance-ultra": "file:/absolute/path/to/your/checkout" },
+  "dsh": { "profile": { "bundles": ["...", "dsh-prompt-enhance-ultra"] } }
 }
 ```
 
-Also create a `node_modules/dsh-prompt-enhance` junction/symlink to the checkout so the
+Also create a `node_modules/dsh-prompt-enhance-ultra` junction/symlink to the checkout so the
 profile can resolve the package. Add the bundle name to the **end** of `bundles`; the last
 patch wins.
 

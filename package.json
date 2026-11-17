@@ -1,17 +1,17 @@
 {
-  "name": "dsh-prompt-enhance",
-  "version": "1.5.0",
-  "description": "DSH plugin: turn a rough draft in the chat composer into an executable prompt at the length you pick (concise, default or thorough). The automatic mode classifies the draft and returns three route-tagged candidates; the advanced panel keeps code mode (reads the workspace, audits security), creative mode (enriches or structures scripts) and documentation mode (reads an existing document's skeleton and fills in the gaps). Methodologies adapt between Superpowers, Prompt Optimizer, LangGPT and AiShort.",
+  "name": "dsh-prompt-enhance-ultra",
+  "version": "1.6.0",
+  "description": "DSH plugin: turn a rough draft in the chat composer into an executable prompt. The automatic mode classifies the draft and streams two candidates — a concise pass that keeps your own words and only adds execution notes, and the best-fitting methodology — each as long as the task needs; the advanced panel picks a family (code reads the workspace and audits security, creative enriches or structures a script, documentation fills an existing skeleton) and a length level (concise, default, thorough). Techniques adapt between Superpowers, Prompt Optimizer, LangGPT and AiShort.",
   "type": "module",
   "license": "MIT",
   "author": "EasonQuantico",
-  "homepage": "https://github.com/EasonQuantico/dsh-prompt-enhance#readme",
+  "homepage": "https://github.com/EasonQuantico/dsh-prompt-enhance-ultra#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/EasonQuantico/dsh-prompt-enhance.git"
+    "url": "git+https://github.com/EasonQuantico/dsh-prompt-enhance-ultra.git"
   },
   "bugs": {
-    "url": "https://github.com/EasonQuantico/dsh-prompt-enhance/issues"
+    "url": "https://github.com/EasonQuantico/dsh-prompt-enhance-ultra/issues"
   },
   "keywords": [
     "dsh",
@@ -21,8 +21,8 @@
     "prompt",
     "prompt-engineering",
     "prompt-optimization",
-    "prompt-enhancement",
-    "prompt-enhancer",
+    "prompt-enhance-ultrament",
+    "prompt-enhance-ultrar",
     "documentation",
     "technical-writing",
     "coding-agent",

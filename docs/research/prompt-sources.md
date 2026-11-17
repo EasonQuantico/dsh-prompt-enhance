@@ -1,7 +1,7 @@
-# Prompt sources for `dsh-prompt-enhance`
+# Prompt sources for `dsh-prompt-enhance-ultra`
 
 Provenance and condensed principles for the four upstream projects that feed the plugin's
-prompt-enhancement variants (`code-read`, `code-only`, `creative-rich`, `creative-structure`).
+prompt-enhance-ultrament variants (`code-read`, `code-only`, `creative-rich`, `creative-structure`).
 
 Research date: 2026-10-25. Each section below records the repository, what it is, its licence,
 the techniques it is known for, and the exact in-repo files that carry the prompt text.
@@ -438,3 +438,23 @@ string is reproduced verbatim in the `.mjs` file.
 - **Prompt Optimizer's licence text** was not read, hence `license: 'unknown'` in the fragments.
 - **LangGPT's docs** were read for argument and terminology; the quotes above are kept to one line
   each, and the longer essays are paraphrased rather than excerpted.
+
+---
+
+## 5. Samuel-Shek/prompt-optimizer-skill (added 2026-11-17)
+
+Repository: <https://github.com/Samuel-Shek/prompt-optimizer-skill> — MIT, 7 stars at read time,
+updated 2026-11-15. Files read: `SKILL.md` (v4.1.3, 17497 B) and `references/methods.md`
+(4320 B), fetched through the GitHub API over a local SOCKS proxy.
+
+What the skill does: it is a prompt *editor*, not a prompt *writer*. Its central rule is
+"your words first, only add notes" — the user request is copied verbatim into a block, and
+every optimization lives in a subordinate notes block, so the model executing the prompt cannot
+drift away from what the user asked. Secondary rules: additions write only *how* (never new
+bans, counts, orderings or acceptance criteria); gaps become `{{待填写：名称｜格式示例}}`
+placeholders; unresolved conflicts go to a "待确认" list; the final answer carries no meta
+commentary.
+
+What we distilled: exactly that rule set, rewritten as the Chinese `CONCISE_RULES` in
+`strategies.js`, and used by the automatic mode first candidate. No line of the upstream
+skill file is reproduced, and the upstream `evals/` were not run against this plugin.

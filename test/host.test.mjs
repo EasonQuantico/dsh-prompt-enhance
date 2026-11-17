@@ -63,7 +63,7 @@ function makeContext(options = {}) {
 function makeRequest(options = {}) {
   const {
     method = 'GET',
-    url = '/prompt-enhance/api/state',
+    url = '/prompt-enhance-ultra/api/state',
     headers = {},
     body,
     remoteAddress = '127.0.0.1',
@@ -147,7 +147,7 @@ async function call(handler, options) {
 }
 
 async function makeFixture() {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-prompt-enhance-test-'))
+  const root = await mkdtemp(join(tmpdir(), 'dsh-prompt-enhance-ultra-test-'))
   await mkdir(join(root, 'src'), { recursive: true })
   await writeFile(
     join(root, 'package.json'),
@@ -174,10 +174,10 @@ async function makeFixture() {
 test('apply registers one prefix route and exposes its disposer', () => {
   const { route, disposers, logs } = mount()
   assert.equal(route.kind, 'prefix')
-  assert.equal(route.path, '/prompt-enhance/api')
+  assert.equal(route.path, '/prompt-enhance-ultra/api')
   assert.equal(typeof route.handler, 'function')
   assert.equal(disposers.length, 1)
-  assert.ok(logs.some(([, message]) => message.includes('mounted /prompt-enhance/api')))
+  assert.ok(logs.some(([, message]) => message.includes('mounted /prompt-enhance-ultra/api')))
 
   disposers[0]()
   assert.equal(route.disposed, true)
@@ -205,7 +205,7 @@ test('POST requires same-origin and JSON content type', async () => {
 
   const crossSite = await call(handler, {
     method: 'POST',
-    url: '/prompt-enhance/api/presence',
+    url: '/prompt-enhance-ultra/api/presence',
     headers: { 'sec-fetch-site': 'cross-site' },
     body: { event: 'x' },
   })
@@ -213,7 +213,7 @@ test('POST requires same-origin and JSON content type', async () => {
 
   const crossOrigin = await call(handler, {
     method: 'POST',
-    url: '/prompt-enhance/api/presence',
+    url: '/prompt-enhance-ultra/api/presence',
     headers: { origin: 'http://evil.example' },
     body: { event: 'x' },
   })
@@ -221,7 +221,7 @@ test('POST requires same-origin and JSON content type', async () => {
 
   const formPost = await call(handler, {
     method: 'POST',
-    url: '/prompt-enhance/api/presence',
+    url: '/prompt-enhance-ultra/api/presence',
     headers: { 'sec-fetch-site': 'same-origin', 'content-type': 'text/plain' },
     body: 'event=x',
   })
@@ -230,7 +230,7 @@ test('POST requires same-origin and JSON content type', async () => {
 
   const sameOriginWithOrigin = await call(handler, {
     method: 'POST',
-    url: '/prompt-enhance/api/presence',
+    url: '/prompt-enhance-ultra/api/presence',
     headers: { 'sec-fetch-site': 'same-origin', origin: 'http://127.0.0.1:2896' },
     body: { event: 'ok', detail: 'same-origin-with-header' },
   })
@@ -247,7 +247,7 @@ test('OPTIONS preflight is answered without CORS wildcards', async () => {
 
 test('unknown endpoints return 404', async () => {
   const { handler } = mount()
-  const response = await call(handler, { url: '/prompt-enhance/api/nope' })
+  const response = await call(handler, { url: '/prompt-enhance-ultra/api/nope' })
   assert.equal(response.statusCode, 404)
   assert.equal(response.json().error.code, 'not-found')
 })
@@ -316,7 +316,7 @@ test('workspace excerpts honour maxExcerptChars from the config', async () => {
     const { handler } = mount({ stream, config: { maxExcerptChars: 40 } })
     await call(handler, {
       method: 'POST',
-      url: '/prompt-enhance/api/enhance',
+      url: '/prompt-enhance-ultra/api/enhance',
       headers: { 'sec-fetch-site': 'same-origin' },
       body: {
         prompt: '补全这个工具',
@@ -341,7 +341,7 @@ test('/presence records beats that /state echoes back', async () => {
   const { handler } = mount()
   const post = await call(handler, {
     method: 'POST',
-    url: '/prompt-enhance/api/presence',
+    url: '/prompt-enhance-ultra/api/presence',
     headers: { 'sec-fetch-site': 'same-origin' },
     body: { event: 'panel-open', detail: 'code/code-read' },
   })
@@ -358,7 +358,7 @@ test('/presence truncates oversized fields', async () => {
   const { handler } = mount()
   await call(handler, {
     method: 'POST',
-    url: '/prompt-enhance/api/presence',
+    url: '/prompt-enhance-ultra/api/presence',
     body: { event: 'e'.repeat(120), detail: 'd'.repeat(2000) },
   })
   const beat = (await call(handler)).json().client.recent.at(-1)
@@ -391,7 +391,7 @@ test('/enhance rejects bad requests with stable error codes', async () => {
     const { handler } = mount()
     const response = await call(handler, {
       method: 'POST',
-      url: '/prompt-enhance/api/enhance',
+      url: '/prompt-enhance-ultra/api/enhance',
       headers: { 'sec-fetch-site': 'same-origin' },
       body,
     })
@@ -404,7 +404,7 @@ test('/enhance returns 503 when no model route exists', async () => {
   const { handler } = mount({ config: { provider: '', model: '' }, selection: null, providers: [] })
   const response = await call(handler, {
     method: 'POST',
-    url: '/prompt-enhance/api/enhance',
+    url: '/prompt-enhance-ultra/api/enhance',
     headers: { 'sec-fetch-site': 'same-origin' },
     body: { prompt: '补全工具', mode: 'code', variant: 'code-only', focus: ['framework'] },
   })
@@ -420,13 +420,12 @@ test('/candidates rejects bad requests with stable error codes', async () => {
   const cases = [
     [{ prompt: '' }, 400, 'empty-prompt'],
     [{ prompt: 'x'.repeat(201) }, 413, 'prompt-too-long'],
-    [{ prompt: 'hi', depth: 'epic' }, 400, 'bad-depth'],
   ]
   for (const [body, status, code] of cases) {
     const { handler } = mount()
     const response = await call(handler, {
       method: 'POST',
-      url: '/prompt-enhance/api/candidates',
+      url: '/prompt-enhance-ultra/api/candidates',
       headers: { 'sec-fetch-site': 'same-origin' },
       body,
     })
@@ -437,7 +436,7 @@ test('/candidates rejects bad requests with stable error codes', async () => {
   const { handler } = mount({ config: { provider: '', model: '' }, selection: null, providers: [] })
   const response = await call(handler, {
     method: 'POST',
-    url: '/prompt-enhance/api/candidates',
+    url: '/prompt-enhance-ultra/api/candidates',
     headers: { 'sec-fetch-site': 'same-origin' },
     body: { prompt: 'hi' },
   })
@@ -445,7 +444,7 @@ test('/candidates rejects bad requests with stable error codes', async () => {
   assert.equal(response.json().error.code, 'no-model')
 })
 
-test('/candidates recognizes the intent and streams three route-tagged candidates', async () => {
+test('/candidates recognizes the intent and streams two route-tagged candidates', async () => {
   const script = JSON.stringify({ intent: 'creative', summary: '雨夜咖啡馆短片剧本', keywords: ['剧本', '短片'] })
 
   // A queue: the first call is the intent probe, then one stream per candidate.
@@ -454,9 +453,11 @@ test('/candidates recognizes the intent and streams three route-tagged candidate
     { type: 'finish', reason: { kind: 'stop' } },
   ]
   const perCandidate = [
-    [{ type: 'text-delta', text: '### 剧本候选 A\n雨夜咖啡馆的场景卡。' }, { type: 'finish', reason: { kind: 'stop' } }],
-    [{ type: 'text-delta', text: '### 剧本候选 B\n编剧路线的节拍表。' }, { type: 'finish', reason: { kind: 'stop' } }],
-    [{ type: 'text-delta', text: '### 剧本候选 C\n结构路线的骨架。' }, { type: 'finish', reason: { kind: 'stop' } }],
+    [
+      { type: 'text-delta', text: '写一个雨夜咖啡馆的短片剧本，三分钟以内，结尾留一个反转：\n先确定三位人物与各自想要什么，再写四场戏；对白用短句。' },
+      { type: 'finish', reason: { kind: 'stop' } },
+    ],
+    [{ type: 'text-delta', text: '### 剧本候选 B\nLangGPT 路线的节拍表。' }, { type: 'finish', reason: { kind: 'stop' } }],
   ]
   const calls = []
   let callIndex = 0
@@ -472,9 +473,9 @@ test('/candidates recognizes the intent and streams three route-tagged candidate
   const { handler } = mount({ stream: streamFn })
   const response = await call(handler, {
     method: 'POST',
-    url: '/prompt-enhance/api/candidates',
+    url: '/prompt-enhance-ultra/api/candidates',
     headers: { 'sec-fetch-site': 'same-origin' },
-    body: { prompt: '写一个雨夜咖啡馆的短片剧本', depth: 'default' },
+    body: { prompt: '写一个雨夜咖啡馆的短片剧本', depth: 'thorough' },
   })
 
   assert.equal(response.statusCode, 200)
@@ -483,8 +484,9 @@ test('/candidates recognizes the intent and streams three route-tagged candidate
   const events = response.sse()
   const meta = events.find((item) => item.event === 'meta').data
   assert.equal(meta.provider, 'test-provider')
-  assert.equal(meta.depth, 'default')
-  assert.deepEqual(meta.routes, ['methodology', 'act', 'structure'])
+  // The automatic mode has no length level: a stray depth is ignored, not honoured.
+  assert.equal('depth' in meta, false)
+  assert.deepEqual(meta.routes, ['concise', 'methodology'])
   assert.equal(meta.stage, 'intent')
 
   const intent = events.find((item) => item.event === 'status' && item.data.stage === 'intent').data
@@ -493,26 +495,46 @@ test('/candidates recognizes the intent and streams three route-tagged candidate
 
   const plan = events.find((item) => item.event === 'status' && item.data.stage === 'plan').data
   assert.equal(plan.intent, 'creative')
-  assert.equal(plan.candidates.length, 3)
-  assert.deepEqual(plan.candidates.map((item) => item.slot), [0, 1, 2])
-  assert.equal(plan.candidates.find((item) => item.route === 'act').label, '编剧')
+  assert.equal(plan.candidates.length, 2)
+  assert.deepEqual(plan.candidates.map((item) => item.slot), [0, 1])
+  assert.equal(plan.candidates[0].route, 'concise')
+  assert.equal(plan.candidates[0].label, '简洁优化')
+  assert.equal(plan.candidates[1].route, 'methodology')
+  assert.ok(plan.candidates[1].label.length > 0, 'the methodology candidate names its technique')
 
-  for (const slot of [0, 1, 2]) {
+  for (const slot of [0, 1]) {
     assert.ok(events.some((item) => item.event === 'slot-done' && item.data.slot === slot), `slot ${slot} completed`)
   }
   const done = events.find((item) => item.event === 'done').data
   assert.equal(done.intent, 'creative')
-  assert.equal(done.slots.length, 3)
-  assert.deepEqual(done.slots.map((item) => item.route), ['methodology', 'act', 'structure'])
-  assert.ok(done.slots[1].text.includes('编剧路线'))
-  assert.ok(done.slots[0].reason.length > 0)
+  assert.equal(done.slots.length, 2)
+  assert.deepEqual(done.slots.map((item) => item.route), ['concise', 'methodology'])
+  assert.ok(done.slots[0].text.startsWith('写一个雨夜咖啡馆的短片剧本'))
+  assert.ok(done.slots[1].reason.length > 0)
 
-  // One intent call + three candidate calls, each a single user message.
-  assert.equal(calls.length, 4)
-  const enhanceCall = calls[1]
-  assert.match(enhanceCall.messages[0].content[0].text, /^<增强指令>\n/)
-  assert.match(enhanceCall.messages[0].content[0].text, /<\/增强指令>\n\n<用户原提示词>\n/)
-  assert.match(enhanceCall.messages[0].content[0].text, /<\/用户原提示词>$/)
+  // One intent call + two candidate calls, each a single user message.
+  assert.equal(calls.length, 3)
+  for (const candidateCall of [calls[1], calls[2]]) {
+    assert.match(candidateCall.messages[0].content[0].text, /^<增强指令>\n/)
+    assert.match(candidateCall.messages[0].content[0].text, /<\/增强指令>\n\n<用户原提示词>\n/)
+    assert.match(candidateCall.messages[0].content[0].text, /<\/用户原提示词>$/)
+    assert.equal(/硬上限 \d+ 字/.test(candidateCall.messages[0].content[0].text), false)
+    assert.equal(/篇幅档位/.test(candidateCall.messages[0].content[0].text), false)
+  }
+
+  // Slot 0 is the concise pass: the user's words are the spine, additions stay subordinate.
+  const conciseCall = calls[1].messages[0].content[0].text
+  assert.match(conciseCall, /原话逐字保留/)
+  assert.match(conciseCall, /只加不改/)
+  assert.match(conciseCall, /不得新增原话里没有的/)
+  assert.match(conciseCall, /不要出现任何模板小标题/)
+  assert.equal(/以下为补充建议/.test(conciseCall), false, 'the old section template must be gone')
+  assert.equal(/方法论（/.test(conciseCall), false)
+
+  // Slot 1 is the methodology candidate: it carries the technique and the length policy.
+  const methodologyCall = calls[2].messages[0].content[0].text
+  assert.match(methodologyCall, /方法论（/)
+  assert.match(methodologyCall, /篇幅要求：不设档位/)
 })
 
 test('/candidates falls back to a heuristic intent when the model answer is not JSON', async () => {
@@ -534,7 +556,7 @@ test('/candidates falls back to a heuristic intent when the model answer is not 
   const { handler } = mount({ stream: streamFn })
   const response = await call(handler, {
     method: 'POST',
-    url: '/prompt-enhance/api/candidates',
+    url: '/prompt-enhance-ultra/api/candidates',
     headers: { 'sec-fetch-site': 'same-origin' },
     body: { prompt: '给桌面小工具加批量重命名：选择文件夹、按日期改名、可撤销' },
   })
@@ -572,26 +594,27 @@ test('/candidates keeps going when one route fails and reports slot-error', asyn
   const { handler } = mount({ stream: streamFn })
   const response = await call(handler, {
     method: 'POST',
-    url: '/prompt-enhance/api/candidates',
+    url: '/prompt-enhance-ultra/api/candidates',
     headers: { 'sec-fetch-site': 'same-origin' },
     body: { prompt: '做一个上传报销单的网页' },
   })
   const events = response.sse()
   assert.ok(events.some((item) => item.event === 'slot-error' && item.data.slot === 0), 'slot 0 failed')
   const done = events.find((item) => item.event === 'done').data
-  assert.equal(done.slots.length, 2, 'the remaining two candidates still arrive')
+  assert.equal(done.slots.length, 1, 'the remaining candidate still arrives')
+  assert.deepEqual(done.slots.map((item) => item.route), ['methodology'])
   assert.ok(!done.slots.some((item) => item.slot === 0), 'the failed slot is not in the result')
 })
 
-test('/state lists the act roles and auto routes', async () => {
+test('/state lists the two automatic routes', async () => {
   const { handler } = mount()
-  const response = await call(handler, { method: 'GET', url: '/prompt-enhance/api/state' })
+  const response = await call(handler, { method: 'GET', url: '/prompt-enhance-ultra/api/state' })
   const body = response.json()
-  assert.ok(Array.isArray(body.acts) && body.acts.length >= 8, 'the act catalogue is exposed')
-  for (const act of body.acts) {
-    assert.ok(act.id && act.zh && act.en && Array.isArray(act.applies), 'acts are bilingual and scoped')
+  assert.deepEqual(body.routes.map((item) => item.id), ['concise', 'methodology'])
+  for (const route of body.routes) {
+    assert.ok(route.label && route.labelEn && route.hint, 'routes are bilingual and self-describing')
   }
-  assert.deepEqual(body.routes.map((item) => item.id), ['methodology', 'act', 'structure'])
+  assert.equal('acts' in body, false, 'the role library is gone')
 })
 
 /* ------------------------------------------------------------------ */
@@ -623,7 +646,7 @@ test('/enhance streams meta, status, deltas and a tidied result', async () => {
     const { handler } = mount({ stream })
     const response = await call(handler, {
       method: 'POST',
-      url: '/prompt-enhance/api/enhance',
+      url: '/prompt-enhance-ultra/api/enhance',
       headers: { 'sec-fetch-site': 'same-origin' },
       body: {
         prompt: '把批量重命名图片的小工具补全',
@@ -690,7 +713,7 @@ test('/enhance honours an explicit methodology and keeps it out of workspace sca
   const { handler } = mount({ stream })
   const response = await call(handler, {
     method: 'POST',
-    url: '/prompt-enhance/api/enhance',
+    url: '/prompt-enhance-ultra/api/enhance',
     headers: { 'sec-fetch-site': 'same-origin' },
     body: {
       prompt: '写一个雨夜咖啡馆的短片开头',
@@ -713,7 +736,7 @@ test('/enhance takes the requested depth and reports its budget', async () => {
   const { handler } = mount({ stream })
   const response = await call(handler, {
     method: 'POST',
-    url: '/prompt-enhance/api/enhance',
+    url: '/prompt-enhance-ultra/api/enhance',
     headers: { 'sec-fetch-site': 'same-origin' },
     body: {
       prompt: '写一个批量重命名图片的桌面工具',
@@ -744,7 +767,7 @@ test('an omitted depth defaults to the middle band', async () => {
   const { handler } = mount({ stream })
   const response = await call(handler, {
     method: 'POST',
-    url: '/prompt-enhance/api/enhance',
+    url: '/prompt-enhance-ultra/api/enhance',
     headers: { 'sec-fetch-site': 'same-origin' },
     body: { prompt: '补全', mode: 'code', variant: 'code-only', focus: ['framework'], methodology: 'langgpt' },
   })
@@ -763,7 +786,7 @@ test('a max-tokens finish is reported as truncated', async () => {
   const { handler } = mount({ stream })
   const response = await call(handler, {
     method: 'POST',
-    url: '/prompt-enhance/api/enhance',
+    url: '/prompt-enhance-ultra/api/enhance',
     headers: { 'sec-fetch-site': 'same-origin' },
     body: { prompt: '补全', mode: 'code', variant: 'code-only', focus: ['framework'] },
   })
@@ -781,7 +804,7 @@ test('upstream failures become error events', async () => {
   })
   const response = await call(handler, {
     method: 'POST',
-    url: '/prompt-enhance/api/enhance',
+    url: '/prompt-enhance-ultra/api/enhance',
     headers: { 'sec-fetch-site': 'same-origin' },
     body: { prompt: '补全', mode: 'code', variant: 'code-only', focus: ['framework'] },
   })
@@ -795,7 +818,7 @@ test('an empty model answer becomes empty-result', async () => {
   const { handler } = mount({ stream })
   const response = await call(handler, {
     method: 'POST',
-    url: '/prompt-enhance/api/enhance',
+    url: '/prompt-enhance-ultra/api/enhance',
     headers: { 'sec-fetch-site': 'same-origin' },
     body: { prompt: '补全', mode: 'code', variant: 'code-only', focus: ['framework'] },
   })
@@ -807,7 +830,7 @@ test('bad JSON bodies are rejected with 400', async () => {
   const { handler } = mount()
   const response = await call(handler, {
     method: 'POST',
-    url: '/prompt-enhance/api/enhance',
+    url: '/prompt-enhance-ultra/api/enhance',
     headers: { 'sec-fetch-site': 'same-origin' },
     body: '{"prompt":',
   })
@@ -823,7 +846,7 @@ test('/workspace scans the requested directory and reports heuristics', async ()
   try {
     const { handler } = mount({ projects: null })
     const response = await call(handler, {
-      url: `/prompt-enhance/api/workspace?refresh=1&cwd=${encodeURIComponent(root)}`,
+      url: `/prompt-enhance-ultra/api/workspace?refresh=1&cwd=${encodeURIComponent(root)}`,
     })
     const body = response.json()
 
@@ -853,7 +876,7 @@ test('/workspace scans the requested directory and reports heuristics', async ()
 
 test('/workspace ignores a missing cwd and falls back', async () => {
   const { handler } = mount({ projects: null })
-  const body = (await call(handler, { url: '/prompt-enhance/api/workspace?cwd=/definitely/not/here' })).json()
+  const body = (await call(handler, { url: '/prompt-enhance-ultra/api/workspace?cwd=/definitely/not/here' })).json()
   assert.equal(body.ok, true)
   assert.ok(body.root)
   assert.notEqual(body.root, '/definitely/not/here')
@@ -867,7 +890,7 @@ test('/cancel is idempotent with no jobs in flight', async () => {
   const { handler } = mount()
   const response = await call(handler, {
     method: 'POST',
-    url: '/prompt-enhance/api/cancel',
+    url: '/prompt-enhance-ultra/api/cancel',
     headers: { 'sec-fetch-site': 'same-origin' },
     body: {},
   })
@@ -884,7 +907,7 @@ test('/documents lists readable documents and outlines the automatic pick', asyn
   try {
     const { handler } = mount({ projects: null })
     const response = await call(handler, {
-      url: `/prompt-enhance/api/documents?refresh=1&cwd=${encodeURIComponent(root)}`,
+      url: `/prompt-enhance-ultra/api/documents?refresh=1&cwd=${encodeURIComponent(root)}`,
     })
     const body = response.json()
 
@@ -922,7 +945,7 @@ test('/documents honours an explicit path and ignores paths outside the workspac
     const { handler } = mount({ projects: null })
 
     const inside = await call(handler, {
-      url: `/prompt-enhance/api/documents?cwd=${encodeURIComponent(root)}&path=docs%2Fguide.md`,
+      url: `/prompt-enhance-ultra/api/documents?cwd=${encodeURIComponent(root)}&path=docs%2Fguide.md`,
     })
     const body = inside.json()
     assert.equal(body.selected.path, 'docs/guide.md')
@@ -933,7 +956,7 @@ test('/documents honours an explicit path and ignores paths outside the workspac
     assert.ok(body.documents.some((entry) => entry.path === 'docs/guide.md'))
 
     const outside = await call(handler, {
-      url: `/prompt-enhance/api/documents?cwd=${encodeURIComponent(root)}&path=..%2Fescape.md`,
+      url: `/prompt-enhance-ultra/api/documents?cwd=${encodeURIComponent(root)}&path=..%2Fescape.md`,
     })
     assert.equal(outside.statusCode, 200)
     assert.equal(outside.json().selected, null)
@@ -949,7 +972,7 @@ test('/documents reports the full length and marks a truncated excerpt', async (
     await writeFile(join(root, 'README.md'), long)
     const { handler } = mount({ projects: null, config: { maxDocumentChars: 40 } })
     const body = (await call(handler, {
-      url: `/prompt-enhance/api/documents?cwd=${encodeURIComponent(root)}`,
+      url: `/prompt-enhance-ultra/api/documents?cwd=${encodeURIComponent(root)}`,
     })).json()
 
     assert.equal(body.selected.truncated, true)
@@ -979,7 +1002,7 @@ test('/enhance doc-fill reads the document and frames it as evidence', async () 
     const { handler } = mount({ projects: null, stream })
     const response = await call(handler, {
       method: 'POST',
-      url: '/prompt-enhance/api/enhance',
+      url: '/prompt-enhance-ultra/api/enhance',
       headers: { 'sec-fetch-site': 'same-origin' },
       body: {
         prompt: '给安装章节补上离线安装，并在常见问题里补两条',
@@ -1028,7 +1051,7 @@ test('/enhance doc-draft needs no document and says so in the digest slot', asyn
   const { handler } = mount({ stream })
   const response = await call(handler, {
     method: 'POST',
-    url: '/prompt-enhance/api/enhance',
+    url: '/prompt-enhance-ultra/api/enhance',
     headers: { 'sec-fetch-site': 'same-origin' },
     body: { prompt: '写一份季度复盘文档', mode: 'doc', variant: 'doc-draft' },
   })
@@ -1049,7 +1072,7 @@ test('doc-fill error codes are explicit 400s', async () => {
     const post = (body) =>
       call(handler, {
         method: 'POST',
-        url: '/prompt-enhance/api/enhance',
+        url: '/prompt-enhance-ultra/api/enhance',
         headers: { 'sec-fetch-site': 'same-origin' },
         body: { mode: 'doc', variant: 'doc-fill', ...body },
       })
@@ -1075,7 +1098,7 @@ test('doc variants reject a mismatched mode and accept the code focuses check', 
   const { handler } = mount()
   const mismatch = await call(handler, {
     method: 'POST',
-    url: '/prompt-enhance/api/enhance',
+    url: '/prompt-enhance-ultra/api/enhance',
     headers: { 'sec-fetch-site': 'same-origin' },
     body: { prompt: '补写', mode: 'doc', variant: 'code-read' },
   })
@@ -1084,7 +1107,7 @@ test('doc variants reject a mismatched mode and accept the code focuses check', 
 
   const badMode = await call(handler, {
     method: 'POST',
-    url: '/prompt-enhance/api/enhance',
+    url: '/prompt-enhance-ultra/api/enhance',
     headers: { 'sec-fetch-site': 'same-origin' },
     body: { prompt: '补写', mode: 'design', variant: 'doc-fill' },
   })

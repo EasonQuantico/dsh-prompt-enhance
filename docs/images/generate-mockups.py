@@ -260,9 +260,16 @@ def panel_head(draw, x, y, w, subtitle="先选类型，再增强；结果会回�
     text(draw, x, y, "提示词增强", font("bold", 13), TEXT)
     text(draw, x, y + s(19), subtitle, font("ui", 11), TEXT3)
     if chips:
-        cursor = x
+        # Right-align the language chips against the close button so they never sit on the title.
+        widths = []
         for label, active in chips:
-            cursor = panel_check(draw, cursor, y + s(4), label, active) + s(6)
+            tw = draw.textlength(label, font=font("ui", 12))
+            widths.append(tw + s(20) + (s(14) if active else 0))
+        total = sum(widths) + s(6) * (len(chips) - 1)
+        cursor = x + w - s(30) - total
+        for (label, active), width in zip(chips, widths):
+            panel_check(draw, cursor, y + s(4), label, active)
+            cursor += width + s(6)
     bx = x + w - s(22)
     rounded(draw, [bx, y - s(2), bx + s(22), y + s(20)], s(6), fill=PANEL_HI)
     text(draw, bx + s(11), y + s(9), "×", font("ui", 13), TEXT3, anchor="mm")
@@ -449,19 +456,14 @@ def render_composer(path):
 
 AUTO_CARDS = (
     (
-        "方法论路线 · LangGPT 结构化提示词",
+        "简洁优化 · 原话为准",
+        "保留你的原话，只补必要的执行说明（自动选择）",
+        ("任务：给周报改得简洁一点", "用户原话（按此执行）：…", "补充说明：以下为补充建议…"),
+    ),
+    (
+        "方法论 · LangGPT 结构化提示词",
         "创作场景下 LangGPT 的结构化手法最贴合（自动选择）",
-        ("【角色】深夜咖啡馆的驻唱歌手……", "【背景】雨夜，霓虹在积水里晕开……", "【节奏】三个场景，情绪先抑后扬……"),
-    ),
-    (
-        "角色路线 · 编剧",
-        "识别为创作类，编剧 的手法与需求最贴合",
-        ("一句话故事线：……", "场景卡：场号｜时间｜地点｜冲突……", "台词风格：短句、留白……"),
-    ),
-    (
-        "结构路线 · Prompt Optimizer",
-        "同一识别结果下换一种结构化手法（Prompt Optimizer）",
-        ("## 角色", "## 场景", "## 交付"),
+        ("【角色】资深文案编辑", "【背景】给老板的周报…", "【节奏】先结论，后细节"),
     ),
 )
 
@@ -548,17 +550,14 @@ def render_auto(path):
     card_gap = s(10)
     for card in AUTO_CARDS:
         y += auto_card_metrics(card[2])["height"] + card_gap
-    depth_y = y - card_gap + s(6)
-    y = depth_y + s(26)
-    bottom = y + s(7)
+    bottom = y - card_gap + s(7)
     panel[3] = bottom
 
     notes = Notes(edge_x, s(1172), s(300))
     notes.add(view_y + s(16), "自动 | 高级", "自动是默认视图，高级是原来的完整面板")
     notes.add(meta_y + s(6), "需求识别", "类型 + 一句话摘要；模型答不上时回落关键词，界面会标来源")
-    notes.add(cards_y + s(14), "三条候选路线", "各标出处：方法论 / 角色 / 结构")
-    notes.add(cards_y + s(100), "使用这组 / 复制", "使用这组回填输入框；复制进剪贴板；三条互不影响")
-    notes.add(depth_y + s(8), "档位在自动视图同样生效", "三组候选共用同一预算")
+    notes.add(cards_y + s(14), "两条候选路线", "简洁优化（原话为准）与方法论最佳匹配，各标出处")
+    notes.add(cards_y + s(100), "使用这组 / 复制", "使用这组回填输入框；复制进剪贴板；两条互不影响")
     notes.place(s(60))
 
     img = Image.new("RGBA", (s(css_w), max(bottom, notes.bottom()) + s(34)), BG + (255,))
@@ -585,8 +584,6 @@ def render_auto(path):
     card_y = cards_y
     for title, hint, preview in AUTO_CARDS:
         card_y = auto_card(draw, inner_x, card_y, inner_w, title, hint, preview) + card_gap
-
-    panel_depth(draw, inner_x, depth_y, inner_x + s(258))
 
     notes.draw(draw)
 
@@ -850,7 +847,7 @@ def panel_doc_block(draw, x, y, w, h):
     nx, ny = x + s(12), y + s(18)
     text(draw, nx, ny, "文档", font("bold", 11), TEXT3)
     label_w = draw.textlength("文档", font=font("bold", 11))
-    mixed(draw, nx + label_w + s(8), ny, "prompt-enhance/README.md", 11, TEXT2)
+    mixed(draw, nx + label_w + s(8), ny, "prompt-enhance-ultra/README.md", 11, TEXT2)
     text(draw, nx, ny + s(34), "11340 字 · 27 个标题", font("ui", 11), TEXT3)
     mixed(draw, nx, ny + s(78), "目录 · 功能 · 界面一览 · 六种增强方式", 10.5, (152, 158, 168))
     panel_select(draw, nx, ny + s(118), w - s(24), "自动挑选（相关性优先）")

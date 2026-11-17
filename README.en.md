@@ -1,28 +1,28 @@
-# dsh-prompt-enhance
+# dsh-prompt-enhance-ultra
 
 > Turn a one-line draft into an executable prompt, right inside the DSH chat box.
 
-[![CI](https://github.com/EasonQuantico/dsh-prompt-enhance/actions/workflows/ci.yml/badge.svg)](https://github.com/EasonQuantico/dsh-prompt-enhance/actions/workflows/ci.yml)
+[![CI](https://github.com/EasonQuantico/dsh-prompt-enhance-ultra/actions/workflows/ci.yml/badge.svg)](https://github.com/EasonQuantico/dsh-prompt-enhance-ultra/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-3c873a.svg)](package.json)
 [![Dependencies](https://img.shields.io/badge/runtime%20deps-none-brightgreen.svg)](package.json)
 
 A plugin for DSH (DeepSeek Harness). It adds a **✨ Prompt Enhance** button to the right of the
 composer. The panel opens on an **Automatic** view by default: the plugin classifies the draft
-(code / creative / documentation) and returns three route-tagged candidates — *methodology*,
-*role* and *structure* — each labelled with its provenance; pick one and it lands in the input
-box. Switch to **Advanced** to pick the refinement style and length yourself: the plugin reads
+(code / creative / documentation) and returns two route-tagged candidates — *concise*
+(your own words, plus only the notes you need) and *best-fit methodology* — each labelled with
+its provenance; pick one and it lands in the input box. Switch to **Advanced** to pick the refinement style and length yourself: the plugin reads
 your workspace (optionally), selects a prompt-engineering methodology, and streams back a
 structured, executable, verifiable prompt — written straight into the input box.
 
 - **Zero runtime dependencies**, no build step, drop it into a profile and go.
-- **Automatic mode**: one intent-recognition call + three candidates (methodology / role / structure), each labelled with its source; a failed route never swallows the others.
+- **Automatic mode**: one intent-recognition call + two candidates (concise / methodology), each labelled with its source; a failed route never swallows the other.
 - **Reads real code**: `code-read` scans the workspace tree, key files and the dependency manifest before rewriting.
 - **Four methodologies, auto-selected**: Superpowers / Prompt Optimizer / LangGPT / AiShort techniques scored per scenario, or pick one manually.
-- **Three lengths**: concise / default / thorough — three lines or a full structure with acceptance criteria, from the same request.
+- **Three lengths, when you want them**: in the advanced view, concise / default / thorough give the same request three lines or a full structure with acceptance criteria. The automatic view lets each candidate pick its own length.
 - **Only writes to the composer** — it never sends a message, and every workspace access is read-only.
 
-![The ✨ Prompt Enhance button and panel: pick code, creative or documentation, then a refinement style](docs/images/ui-composer.png)
+![The ✨ Prompt Enhance button in the composer's control row; clicking it opens the automatic candidates or the advanced panel](docs/images/ui-composer.png)
 
 [中文 README](README.md) · [Internal contract](CONTRACT.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md)
 
@@ -34,7 +34,7 @@ structured, executable, verifiable prompt — written straight into the input bo
 - [At a glance](#at-a-glance)
 - [Automatic mode](#automatic-mode)
 - [The six refinement styles](#the-six-refinement-styles)
-- [Depth: three lengths](#depth-three-lengths)
+- [Depth: three lengths (advanced view)](#depth-three-lengths-advanced-view)
 - [Methodology selection](#methodology-selection)
 - [Installation](#installation)
 - [Usage](#usage)
@@ -54,15 +54,15 @@ structured, executable, verifiable prompt — written straight into the input bo
 | Capability | Description |
 | --- | --- |
 | Persistent button | A pill button in the composer's right-hand control row, present in both the hero and in-session composer |
-| Automatic mode | The panel opens on the "Auto" view: it classifies the draft (code / creative / documentation) and returns three provenance-labelled candidates — *methodology*, *role* and *structure* routes; pick one to write back |
+| Automatic mode | The panel opens on the "Auto" view: it classifies the draft (code / creative / documentation) and returns two provenance-labelled candidates — *concise* (words kept, notes added) and *best-fit methodology*; pick one to write back |
 | Three families, six styles | Advanced view keeps code (read the workspace / prompt-only), creative (enrich / tighten the structure) and documentation (fill in an existing document / draft from a template) |
 | Two code focuses | "Improve the development framework" and "Review security", multi-select, at least one |
-| Three lengths | Concise / default / thorough: a character budget per request, scaled per methodology by measured length |
-| Methodology routing | Four upstream techniques plus `auto` scoring; a dropdown pins one if you disagree. Two of the three automatic routes are ranked by the same scorer |
-| Act-role library | Ten act roles (code review, QA, security audit, architecture, tech writing, screenwriting, novel writing, copy-editing, translation, summarising) distilled from prompts.chat's act cards (CC BY-NC: techniques only, no card text) |
+| Three lengths | In the advanced view: concise / default / thorough, a character budget per request scaled per methodology by measured length; the automatic view has no level — length follows the task |
+| Methodology routing | Four upstream techniques plus `auto` scoring; a dropdown pins one if you disagree. The automatic view's methodology route is ranked by the same scorer |
+| Concise route | "Your words, one finished prompt": the draft stays verbatim as the spine, the notes that say *how* are appended into the same text (no section scaffolding), gaps stay as placeholders, and no constraint you did not ask for is added (technique borrowed from the MIT-licensed prompt-optimizer-skill) |
 | Workspace evidence | Directory tree, manifest summary, prioritised file excerpts, 10 heuristic security findings |
 | Document evidence | Outline first: heading levels, tables, lists, numbering and paragraph length, so additions fit the existing structure |
-| Streaming UI | SSE deltas; first shows “model is thinking… (N chars)” then types the result out. In the auto view the three routes fill in as they complete |
+| Streaming UI | SSE deltas; first shows “model is thinking… (N chars)” then types the result out. In the auto view the two routes fill in as they complete |
 | One-click landing | Replace composer / insert at caret / copy / retry; the result box is editable before applying. Each auto candidate has its own "Use this one" / "Copy" |
 | Preference memory | Last view, family, style, focus, length, methodology and document are remembered in `localStorage` |
 | Diagnostic breadcrumbs | The browser half reports mount/open/start/apply events to the host for console-free debugging |
@@ -73,19 +73,22 @@ structured, executable, verifiable prompt — written straight into the input bo
 > screenshots; the last one diagrams what the document digest carries. Paths, file names and model names
 > in them are examples.
 
-### Automatic: the default view with three candidates
+### Automatic: the default view with two candidates
 
-![The automatic view: auto|advanced switch, intent line, three candidate cards and depth](docs/images/ui-auto.png)
+![The automatic view: auto|advanced switch, intent line and two candidate cards](docs/images/ui-auto.png)
 
 - **① Intent recognition** — the plugin first decides whether the draft is code, creative or documentation,
   with a one-line summary; when the model answer is unusable it falls back to keywords and the UI says so.
-- **② Three candidate routes** — methodology, act-role and structure each produce one candidate; every card
-  is labelled with its route · technique and why it was picked.
-- **③ Progress is visible** — each route owns its slot: streaming text, a check when done, a failure mark when
-  it fails; one failing route never blocks the others.
+- **② Two candidate routes** — "concise" keeps your words and only adds execution notes, "best-fit methodology"
+  applies the highest-scoring technique for the recognized class; every card is labelled with its route · technique
+  and why it was picked.
+- **③ Progress is visible** — each candidate owns its slot: streaming text, a check when done, a failure mark when
+  it fails; one failing route never blocks the other.
 - **④ Pick one to land it** — “use this set” writes the candidate back into the composer; “copy” goes to the
-  clipboard; the three are independent.
-- **⑤ Depth applies here too** — concise / default / thorough share one budget across the three candidates.
+  clipboard; the two are independent.
+- **⑤ No length level** — each candidate decides for itself how long the answer should be: a one-step job
+  stays a few lines, a multi-stage job earns its sections. Nothing is padded to hit a number and no step is
+  dropped to stay short. Switch to “advanced” when you want the length pinned.
 
 ### The button lives in the composer's control row
 
@@ -141,30 +144,32 @@ structured, executable, verifiable prompt — written straight into the input bo
 ## Automatic mode
 
 The panel's top row is an **Auto | Advanced** view switch, defaulting to Auto. The Auto view
-shows one action button, the recognized intent, and three candidate cards:
+shows one action button, the recognized intent, and two candidate cards:
 
-1. **Intent recognition** — the host makes one small call (≤400 tokens, 30 s deadline) to
-   classify the draft as code / creative / doc and summarize it in one sentence; when the
-   answer is not parseable JSON it falls back to a keyword heuristic, and the interface labels
-   the source (`model` / `heuristic`).
-2. **Three candidate routes** — three rewrites per recognized intent:
-   - **Methodology route**: the highest-scoring technique set for that intent from
-     `selectMethodology`;
-   - **Role route**: one of ten act roles picked by keyword scoring (Code Reviewer, QA Tester,
-     Security Auditor, Architect, Tech Writer, Screenwriter, Novelist, Copy Editor, Translator,
-     Summarizer), layered with the runner-up methodology;
-   - **Structure route**: the same recognized intent rewritten with the runner-up house style.
-   Each card shows "route · technique" and why it was picked; a generating route shows a
+1. **Intent recognition** — the host makes one small call (≤400 tokens, `callTimeoutMs` 120 s
+   deadline) to classify the draft as code / creative / doc and summarize it in one sentence;
+   when the call fails or the answer is not parseable JSON it falls back to a keyword heuristic
+   without ending the run, and the interface labels the source (`model` / `heuristic`).
+2. **Two candidate routes** — two rewrites per recognized intent:
+   - **Concise**: the method from
+     [Samuel-Shek/prompt-optimizer-skill](https://github.com/Samuel-Shek/prompt-optimizer-skill) (MIT) — your
+     request stays verbatim as the spine and the execution notes are appended into the same text, so you get
+     **one complete prompt you can paste as-is** (no "Task:" / "user's own words:" / "Notes:" scaffolding).
+     No ban/count/acceptance criterion you did not ask for is invented, gaps stay as
+     `{{to fill: name | format example}}` placeholders, and length stays under about twice the original.
+   - **Best-fit methodology**: the highest-scoring technique set for that intent from
+     `selectMethodology`, carrying its structure and writing requirements.
+   Each card shows "route · technique" and why it was picked; a generating candidate shows a
    placeholder until it finishes, and a failed route is marked as failed without swallowing the
-   others.
+   other (timeouts are per route, so one slow route cannot sink the run).
 3. **Pick one** — "Use this one" writes the candidate back into the composer (still editable),
-   "Copy" puts it on the clipboard; the depth knob applies to all three routes.
+   "Copy" puts it on the clipboard; each route picks its own length for the task — there is no
+   depth knob in this view.
 
-The role techniques come from [f/prompts.chat](https://github.com/f/prompts.chat)'s act cards —
-that repository is CC BY-NC licensed, so this project only distils the *technique* ("a review
-must grade every change with acceptance criteria", "a screenplay starts from a one-line story
-then lands scene cards") and never quotes card text (provenance in
-`docs/research/prompt-sources.md` and `THIRD_PARTY_NOTICES.md`).
+The concise technique comes from
+[Samuel-Shek/prompt-optimizer-skill](https://github.com/Samuel-Shek/prompt-optimizer-skill) (MIT).
+This project borrows the "your words first, only add notes" rules and rewrites the prompt text
+itself; provenance in `docs/research/prompt-sources.md` and `THIRD_PARTY_NOTICES.md`.
 
 ## The six refinement styles
 
@@ -189,10 +194,13 @@ sensitive data, dependency supply chain).
 Every style ends with the same output contract: emit *only* the enhanced prompt — no preamble, no
 commentary, keep the information density, and answer in the same language as the draft.
 
-## Depth: three lengths
+## Depth: three lengths (advanced view)
 
 Models love to write long: the same request can come back as three screens or three lines. The panel's
-**depth axis is independent of family and style** — it only answers “how long should this be”.
+**depth axis is independent of family and style** — it only answers “how long should this be”. The
+automatic view deliberately has no depth axis: its two candidates decide their own length from the
+task, so you never pad a one-step job or truncate a multi-stage one. When you want a predictable
+length, switch to "advanced" and use the table below.
 
 | Depth | Position | superpower | prompt-optimizer | LangGPT | AiShort |
 | --- | --- | --- | --- | --- | --- |
@@ -269,7 +277,7 @@ Requirements: DSH installed (Web GUI or desktop), Node ≥ 20, write access to t
 directory (default `~/.dsh/profiles/<profile>/`). The plugin has no dependencies — no `npm install` needed.
 
 ```bash
-git clone https://github.com/EasonQuantico/dsh-prompt-enhance.git
+git clone https://github.com/EasonQuantico/dsh-prompt-enhance-ultra.git
 ```
 
 ### 1. Register it in the profile manifest
@@ -280,11 +288,11 @@ Add a dependency in `<profile>/package.json` and append the package name to the 
 ```jsonc
 {
   "dependencies": {
-    "dsh-prompt-enhance": "file:/absolute/path/to/dsh-prompt-enhance"
+    "dsh-prompt-enhance-ultra": "file:/absolute/path/to/dsh-prompt-enhance-ultra"
   },
   "dsh": {
     "profile": {
-      "bundles": ["…existing entries…", "dsh-prompt-enhance"]
+      "bundles": ["…existing entries…", "dsh-prompt-enhance-ultra"]
     }
   }
 }
@@ -292,19 +300,19 @@ Add a dependency in `<profile>/package.json` and append the package name to the 
 
 ### 2. Make the package resolvable
 
-Point `<profile>/node_modules/dsh-prompt-enhance` at your checkout (a junction or symlink is fine,
+Point `<profile>/node_modules/dsh-prompt-enhance-ultra` at your checkout (a junction or symlink is fine,
 copying is not required):
 
 ```powershell
 # Windows
 New-Item -ItemType Junction `
-  -Path "$HOME\.dsh\profiles\<profile>\node_modules\dsh-prompt-enhance" `
-  -Target "C:\absolute\path\to\dsh-prompt-enhance"
+  -Path "$HOME\.dsh\profiles\<profile>\node_modules\dsh-prompt-enhance-ultra" `
+  -Target "C:\absolute\path\to\dsh-prompt-enhance-ultra"
 ```
 
 ```bash
 # macOS / Linux
-ln -s /absolute/path/to/dsh-prompt-enhance ~/.dsh/profiles/<profile>/node_modules/dsh-prompt-enhance
+ln -s /absolute/path/to/dsh-prompt-enhance-ultra ~/.dsh/profiles/<profile>/node_modules/dsh-prompt-enhance-ultra
 ```
 
 ### 3. Load it
@@ -314,7 +322,7 @@ ln -s /absolute/path/to/dsh-prompt-enhance ~/.dsh/profiles/<profile>/node_module
   (provided step 2 used a link; a copied directory will not pick the change up — see step 5):
 
   ```powershell
-  Add-Content "$HOME\.dsh\profiles\<profile>\cordis.patch.yml" "# reload prompt-enhance $(Get-Date -Format o)"
+  Add-Content "$HOME\.dsh\profiles\<profile>\cordis.patch.yml" "# reload prompt-enhance-ultra $(Get-Date -Format o)"
   ```
 
 - The browser half (`client.js`) is fetched when the page loads, so **refresh the Web GUI** after updating it.
@@ -322,7 +330,7 @@ ln -s /absolute/path/to/dsh-prompt-enhance ~/.dsh/profiles/<profile>/node_module
 ### 4. Verify
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:<port>/prompt-enhance/api/state
+Invoke-RestMethod http://127.0.0.1:<port>/prompt-enhance-ultra/api/state
 ```
 
 The port can change between launches; use the one the Web GUI is served from.
@@ -333,24 +341,24 @@ After a page refresh the ✨ button should sit in the composer's right-hand cont
 Uninstall: remove the package from `dsh.profile.bundles`, drop the dependency and the junction, then
 trigger one reload.
 
-> No links? Copying the whole directory into `<profile>/node_modules/dsh-prompt-enhance` works too —
+> No links? Copying the whole directory into `<profile>/node_modules/dsh-prompt-enhance-ultra` works too —
 > you just have to re-copy it on every update.
 
 ### 5. New version, old behaviour?
 
 `dsh plugin install` / `pnpm install` **copies** a `file:` dependency into the profile's
 `node_modules` (preserving mtimes). Editing your checkout afterwards leaves that copy frozen, and
-even a restart only loads the stale code. The symptom is `/prompt-enhance/api/state` reporting an
+even a restart only loads the stale code. The symptom is `/prompt-enhance-ultra/api/state` reporting an
 older `version` than `package.json`, with missing families in `modes`.
 
 Check and fix:
 
 ```powershell
-$link = "$HOME\.dsh\profiles\<profile>\node_modules\dsh-prompt-enhance"
+$link = "$HOME\.dsh\profiles\<profile>\node_modules\dsh-prompt-enhance-ultra"
 (Get-Item $link).LinkType          # empty = a real (stale) directory; Junction means it is a link
 Remove-Item $link -Recurse -Force
-New-Item -ItemType Junction -Path $link -Target "C:\absolute\path\to\dsh-prompt-enhance"
-Add-Content "$HOME\.dsh\profiles\<profile>\cordis.patch.yml" "# reload prompt-enhance $(Get-Date -Format o)"
+New-Item -ItemType Junction -Path $link -Target "C:\absolute\path\to\dsh-prompt-enhance-ultra"
+Add-Content "$HOME\.dsh\profiles\<profile>\cordis.patch.yml" "# reload prompt-enhance-ultra $(Get-Date -Format o)"
 ```
 
 After about ten seconds `version` should match `package.json` and `modes` should list
@@ -360,9 +368,8 @@ the files behind the link; the browser half needs one page refresh.
 ## Usage
 
 1. Type a draft in the composer, e.g. “a small tool that batch-renames images”.
-2. Click ✨. The default **Auto** view classifies the draft and returns three candidates:
-   **methodology route**, **role route** and **structure route**, each labelled with its source
-   and the reason it was picked.
+2. Click ✨. The default **Auto** view classifies the draft and returns two candidates:
+   **concise** and **best-fit methodology**, each labelled with its source and the reason it was picked.
 3. Switch to **Advanced** to choose yourself: pick *code*, *creative* or *documentation*, then a
    style; for code styles tick the focuses (both by default).
 4. Leave the methodology on “auto (recommended)”, or pin one; choose a length.
@@ -374,13 +381,13 @@ Tips:
 
 - The more concrete the draft, the closer the result is to your intent; one or two sentences is enough —
   the plugin supplies the structure.
-- The auto mode generates all three routes in one pass — good for "look at a few phrasings, then
+- The auto mode generates both routes in one pass — good for "look at a few phrasings, then
   pick"; when you are in a hurry, the Advanced view goes straight to the point.
 - With `code-read` the panel shows how many files were scanned, which ones, and the first security
   findings — check that it read the directory you meant.
 - The first `code-read` is slower (workspace scan plus reasoning); with `deepseek-v4.1-flash` the
-  first byte arrived in 7–28 s in our tests. The auto mode runs one recognition call plus three
-  routes, so its total time is roughly three times a single enhancement.
+  first byte arrived in 7–28 s in our tests. The auto mode runs one recognition call plus two
+  routes, so its total time is roughly twice a single enhancement.
 - With `doc-fill`, check the “document” line first: is it the file you meant, and do the character and
   heading counts look right? Automatic selection ranks by prompt relevance; open the dropdown to switch.
   Naming the section in your draft works best, e.g. “add concurrency and timeout entries to the
@@ -394,7 +401,7 @@ plugin interface switches immediately, with no page reload.
 
 - The first run follows the DeepSeek Harness interface language (English harness, English plugin). After
   that your pick wins.
-- The choice is stored in this browser under `dsh-prompt-enhance.prefs` (`lang`), so a reload or a restart
+- The choice is stored in this browser under `dsh-prompt-enhance-ultra.prefs` (`lang`), so a reload or a restart
   keeps it.
 - Only the **plugin's** copy changes. DeepSeek Harness keeps its own language — the plugin does not touch
   the host's settings.
@@ -411,7 +418,7 @@ language on screen — no half-translated panel.
 
 ## Configuration
 
-The `config` block of the `prompt-enhance` row in `cordis.patch.yml`:
+The `config` block of the `prompt-enhance-ultra` row in `cordis.patch.yml`:
 
 | Key | Default | Purpose |
 | --- | --- | --- |
@@ -426,7 +433,8 @@ The `config` block of the `prompt-enhance` row in `cordis.patch.yml`:
 | `maxListedDocuments` | `800` | Files visited when ranking candidate documents |
 | `maxDocumentChars` | `16000` | How much document text the documentation styles read; longer files are truncated and labelled |
 | `maxOutputTokens` | `8000` | Output budget per run; reasoning models spend part of it on thinking |
-| `requestTimeoutMs` | `180000` | Per-run timeout |
+| `callTimeoutMs` | `120000` | Timeout **per LLM call** (the intent pass, one manual enhancement, one automatic candidate route) |
+| `requestTimeoutMs` | `420000` | Cap for the **whole run**: in automatic mode it covers the intent pass plus both candidate routes |
 
 Every numeric key is validated: a non-number or a non-positive value falls back to the default.
 
@@ -462,7 +470,7 @@ The browser half only selects and writes back; the host half owns evidence, rout
 | --- | --- |
 | `client.js` | slot registration, button and panel, SSE parsing, progress, write-back (`insertText` / `setDraft`) |
 | `index.js` | the three gates, `/state` `/workspace` `/documents` `/enhance` `/candidates` `/cancel`, `collectWorkspace`, `collectDocument`, `resolveRoute`, SSE |
-| `strategies.js` | vocabularies, `selectMethodology` scoring, the act-role library and `selectAct`, `buildSystemPrompt` / `buildAutoPrompt`, `renderDigest` / `renderDocDigest` evidence framing |
+| `strategies.js` | vocabularies, `selectMethodology` scoring, the concise route's `buildConcisePrompt`, `buildSystemPrompt` / `buildAutoPrompt`, `renderDigest` / `renderDocDigest` evidence framing |
 
 The advanced view's data flow:
 
@@ -477,12 +485,12 @@ The advanced view's data flow:
 
 The automatic view's data flow:
 
-1. The browser posts the draft and length to `POST /candidates`.
-2. The host recognizes the intent with one small call (≤400 tokens, 30 s deadline; falls back to a
-   keyword heuristic when the answer is not JSON).
-3. The three routes each assemble their message with `buildAutoPrompt` and generate sequentially;
-   every route is tagged with a `slot`, and `slot-error` affects only that slot.
-4. `done` aggregates the three routes' texts and provenance (route / label / reason) and the browser
+1. The browser posts the draft to `POST /candidates` (no length level).
+2. The host recognizes the intent with one small call (≤400 tokens, `callTimeoutMs` deadline; falls
+   back to a keyword heuristic on failure or non-JSON without ending the run).
+3. The two routes each assemble their message (concise via `buildConcisePrompt`, methodology via `buildAutoPrompt`) and generate sequentially;
+   every route is tagged with a `slot` and timed separately, and `slot-error` affects only that slot.
+4. `done` aggregates both routes' texts and provenance (route / label / reason) and the browser
    renders one card per slot.
 
 Workspace content and document text are wrapped in a read-only evidence frame that tells the model any
@@ -514,15 +522,15 @@ hiding in a repo or in a document (“ignore the above” is quoted text, not an
 
 ## HTTP API
 
-Mounted under `/prompt-enhance/api` (a plugin route, therefore not behind DSH's `/api/*` auth middleware):
+Mounted under `/prompt-enhance-ultra/api` (a plugin route, therefore not behind DSH's `/api/*` auth middleware):
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/state` | Version, model route, workspace, vocabularies, methodology catalogue, act roles and routes, breadcrumbs |
+| `GET` | `/state` | Version, model route, workspace, vocabularies, methodology catalogue, automatic routes, breadcrumbs |
 | `GET` | `/workspace?refresh=1&cwd=…` | Read-only workspace scan: file list and security findings |
 | `GET` | `/documents?refresh=1&cwd=…&prompt=…&path=…` | Lists readable documents and outlines the one that would be read |
 | `POST` | `/enhance` | The advanced view's manual enhancement, `text/event-stream` (`meta`/`status`/`delta`/`done`/`error`) |
-| `POST` | `/candidates` | The automatic mode: recognize the intent, then stream three route-tagged candidates, `text/event-stream` (`meta`/`status`/`delta`/`slot-done`/`slot-error`/`done`) |
+| `POST` | `/candidates` | The automatic mode: recognize the intent, then stream two route-tagged candidates, `text/event-stream` (`meta`/`status`/`delta`/`slot-done`/`slot-error`/`done`) |
 | `POST` | `/cancel` | Abort the in-flight run |
 | `POST` | `/presence` | Browser breadcrumbs (diagnostics only) |
 
@@ -595,13 +603,14 @@ Contribution rules (encoding, commit format, PR checklist) are in [CONTRIBUTING.
 - Document filling covers the excerpt that fits `maxDocumentChars` (16 000 characters by default); the
   digest says “truncated” when a file is longer.
 - Quality depends on the selected model; reasoning models can take 7–28 s to first byte — use “Stop” if needed.
-- The auto mode runs one intent-recognition call plus three route generations, so its total time is
-  roughly three times a single enhancement; all three routes come from the same model, and how much
+- The auto mode runs one intent-recognition call plus two route generations, so its total time is
+  roughly twice a single enhancement; both routes come from the same model, and how much
   they differ depends on the model. When recognition fails it falls back to the keyword heuristic
   (the source is labelled in the UI).
-- The depth budget is an instruction, not a guarantee: measured output runs ~1.3–1.5× over the quoted
-  number for all four sets. The relative gap between levels is stable; don't expect “concise” to land
-  under exactly 1428 characters.
+- The depth budget is an instruction, not a guarantee (advanced view only): measured output runs
+  ~1.3–1.5× over the quoted number for all four sets. The relative gap between levels is stable; don't
+  expect “concise” to land under exactly 1428 characters. The automatic view has no budget at all —
+  its length follows the task and the model.
 - A blank page with no `sessionId` has no composer control row, so no button is rendered until you enter a session.
 - Below ~600 px of window width the 384 px panel has no room beside its trigger, so it covers the ✨ button
   (the ✕ button and outside clicks still close it).
@@ -618,9 +627,8 @@ The methodology router is based on reading and distilling four public projects �
 - [linshenkx/prompt-optimizer](https://github.com/linshenkx/prompt-optimizer) (licence `NOASSERTION`)
 - [langgptai/LangGPT](https://github.com/langgptai/LangGPT) (Apache-2.0 / README badge says MIT — conflict recorded)
 - [rockbenben/ChatGPT-Shortcut](https://github.com/rockbenben/ChatGPT-Shortcut) (MIT, code)
-
-The automatic mode's act roles are distilled from [f/prompts.chat](https://github.com/f/prompts.chat)'s
-act cards (CC BY-NC family) — techniques only, no card text is quoted.
+- [Samuel-Shek/prompt-optimizer-skill](https://github.com/Samuel-Shek/prompt-optimizer-skill) (MIT) — the concise
+  route's "your words first, only add notes" rules
 
 Licence details and the “no upstream text was copied” statement are in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -4,7 +4,127 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.6.0] — 2026-11-17
+
+### Changed
+
+- Renamed the project to **`dsh-prompt-enhance-ultra`**: the npm package, the GitHub repository
+  (old URLs redirect), the DSH bundle row, the HTTP route prefix (`/prompt-enhance-ultra/api`), the
+  plugin id reported by `/state`, the localStorage preference key and every install snippet. The
+  panel copy stays 「提示词增强」 in Chinese and "Prompt enhancement" in English.
+- The automatic mode now returns **two** candidates instead of three: a **concise** pass and the
+  **best-fit methodology**. The concise pass follows the method of
+  [Samuel-Shek/prompt-optimizer-skill](https://github.com/Samuel-Shek/prompt-optimizer-skill) (MIT):
+  the draft is kept verbatim as the spine and the execution notes are appended into the same prompt,
+  so the candidate is **one complete, ready-to-paste prompt** — no 「任务：」 / 「用户原话（按此执行）：」 /
+  「补充说明：」 section labels, no template scaffolding. Only *how* is written — no invented bans,
+  counts, orderings or acceptance criteria — gaps stay as `{{待填写：名称｜格式示例}}` placeholders, and
+  length is capped at about twice the original.
+- `ACT_ROLES`, `actById` and `selectAct` are gone, along with the `act` and `structure` routes: the
+  prompts.chat-derived role library is no longer shipped. `AUTO_ROUTES` is now
+  `concise` + `methodology`, and `POST /candidates` plans exactly two slots.
+- `buildConcisePrompt({ promptText, intent })` is exported and is what the concise slot calls;
+  `buildAutoPrompt` routes `route: 'concise'` straight to it. `CONCISE_RULES`, `CONCISE_LENGTH_RULE`
+  and the per-intent hints are exported for tests and docs.
+- `GET /state` no longer lists `acts`; its `routes` are the two new ids. The candidate card title falls
+  back to the route label so 「简洁优化 · 简洁优化」 cannot happen.
+- When an automatic run finishes, the candidate list scrolls into view: in a short window the panel
+  scrolls internally, and the two cards could otherwise land just below the fold.
+
+### Docs
+
+- README (both languages) rewritten around the two routes, `CONTRACT.md` documents the two slots and the
+  removed `act` route, `THIRD_PARTY_NOTICES.md` swaps the prompts.chat entry for the MIT skill repository
+  (and records that the role library was removed). `docs/images/ui-auto.png` was regenerated with two cards.
+
+## [1.5.2] — 2026-11-16
+
+### Changed
+
+- The automatic mode no longer has a length level. Each candidate now decides how long its answer should
+  be from the task itself: a one-step job stays a few lines, a multi-stage job earns its sections. In
+  practice:
+  - `POST /candidates` ignores a `depth` field (it neither honours it nor rejects it — no more
+    `bad-depth` on this endpoint), and its system prompt carries a length *policy* (「篇幅要求：不设档位，
+    按任务本身判断该写多长」) instead of a character budget.
+  - `meta` and `done` stopped reporting `depth` / `depthLabel` / `depthBudget`; the three candidates are
+    now free to differ in length, which is the point.
+  - The auto view dropped the depth row and its hint, and says so in one line ("每组候选只按任务需要写长
+    或写短，不凑字数，也不会为了简短丢掉必要步骤"). The advanced view keeps the three levels unchanged.
+  - `buildAutoPrompt` no longer takes `depth`; `AUTO_LENGTH_RULE` is exported so tests and docs can cite
+    the exact wording. `docOutputRule()` now accepts a missing budget and emits the qualitative form.
+
+### Docs
+
+- README (both languages) and `CONTRACT.md` describe the split: automatic = length follows the task,
+  advanced = three levels with budgets. The `ui-auto.png` mockup was regenerated without the depth row.
+
+## [1.5.1] — 2026-11-16
+
+### Changed
+
+- The panel now follows the Harness surface language instead of its own paint:
+  - Header is a title/subtitle stack with the language pill and the close button pushed to the edges;
+    the view switch (`自动 | 高级`) and the in-panel switches (`代码 | 创作 | 文档`, depth chips) are
+    segmented controls on the same 12 px track — the active pill is a white card with a soft
+    elevation, the track is `--dsw-alias-interactive-bg-hover`.
+  - Inputs and results are separated by hairline sections (`.dpe-section` / `.dpe-sep`,
+    `0.5px solid var(--dsw-alias-border-l1)`) so a long panel reads as three blocks instead of one
+    column of boxes.
+  - Small type went up a notch for readability: labels 12 px, hints and meta 11.5 px on an 18 px
+    line, book text 13 px; every interactive element has a `2px solid` `--dsw-alias-button-info-fill`
+    focus ring, and `@media (prefers-reduced-motion: reduce)` removes the remaining transitions.
+  - The panel is 412 px wide (was 384) and anchors its right edge to the trigger, so it sits over the
+    composer's right side instead of floating off-centre.
+
+### Fixed
+
+- The panel could hang over the composer and hide the input: placement used the trigger's top edge
+  as its only anchor. It now finds the composer card (the nearest tall ancestor that owns the
+  contenteditable) and floats above *that*, capping its height to the free space so the input stays
+  visible; on windows narrower than 620 px it becomes a top sheet that spans the width.
+- The refresh button in the workspace/document note stretched to the full panel width (`.dpe-note`
+  is a flex column); it now keeps its own size and aligns left.
+- The auto view's action row and hint were floating between blocks; they are a single left-aligned
+  stack with a full-width primary action, matching the advanced view's composition.
+- The automatic mode could make the panel look dead ("自动优化后页面消失无响应"). Two host-side
+  causes and one client-side cause, all fixed:
+  - `handleCandidates` used one timeout for the whole run (`requestTimeoutMs`) and — on timeout —
+    set `job.closed = true`, which silently killed the stream: the client saw the SSE close without a
+    `done` or `error`, reset its state and showed an empty candidate list. Timeouts are now per LLM
+    call (`callTimeoutMs`, new config key, default 120 000): a slow route only fails *its own*
+    candidate (`slot-error`) while the remaining routes keep generating.
+  - A failed intent pass also aborted the whole run. It now degrades to the keyword heuristic
+    (`status { stage: "intent", degraded: reason }`) and the three candidates still generate.
+  - A new run-level deadline (`requestTimeoutMs`, now 420 000) still ends the whole run when every
+    step had its own chance; cancelling or disconnecting clears it via the job handle.
+- Client fallbacks so the panel can no longer appear dead: an empty candidate list shows an
+  `模型返回了空结果` note instead of a bare label; auto-mode errors render in the `error` state too
+  (they were only visible while idle); the trigger button ignores accidental clicks while the panel
+  is open and candidates are streaming (that click closed the panel mid-run); the notice clear timer
+  no longer overwrites a newer notice after unmount.
+- CSS: `.dpe-auto-candidates` / `.dpe-auto-card` / `.dpe-auto-text` / `.dpe-view-tabs` had no rules
+  at all — candidate cards now stack vertically, previews clamp at 140 px so all three cards stay
+  reachable in the panel's own scroll.
+- The panel vanishing the moment an automatic run started — the real cause: `autoBody` read
+  `runningHint` while that `const` was still declared further down the component, so the first render
+  of the running state threw `ReferenceError: Cannot access 'runningHint' before initialization`.
+  DeepSeek Harness catches a crashed slot entry and unmounts it, which removed the trigger button
+  *and* the panel, so the page looked like it had swallowed the plugin. The hint is now declared
+  before both view bodies, and a regression test pins the declaration order.
+- The advanced view never updated while streaming: `streamSse` dispatches handlers by SSE event
+  name, but `start()` still passed `onMeta`/`onStatus`/`onDelta`/`onDone`/`onError`. Nothing was
+  wired, so the panel sat on "增强中…" and looked frozen even though the host was streaming. The
+  handlers now use the event names (`meta`, `status`, `delta`, `done`, `error`).
+- The panel resized on every token, which saturated layout during a run: three effects measured
+  placement (one of them after *every* render), and each measurement re-fitted the height to the
+  growing text. Measurements are now coalesced to one per animation frame (`requestPlacement`), a
+  `ResizeObserver` replaces the measure-after-every-render effect, and the height is frozen for the
+  duration of a run (`frozenHeightRef`) so the box stops growing under the reader.
+- Streamed text now updates once per frame instead of once per delta (both views), so a fast route
+  no longer forces hundreds of React renders per second.
+- Residue: closing the panel or switching view clears the previous error/notice/toast, so reopening
+  never shows a stale message from the last run.
 
 ### Docs
 
@@ -12,6 +132,8 @@ All notable changes to this project are documented here. The format follows
   `file:` dependency into the profile, so a checkout-only edit keeps the old code alive until that
   copy is replaced by a junction (or re-installed). Also documents that the Web GUI port changes
   between launches.
+
+## [1.5.0] — 2026-11-15
 
 ## [1.5.0] — 2026-11-15
 
@@ -38,7 +160,7 @@ focus, depth, methodology).
 - `buildAutoPrompt`, `selectAct`, `variantForIntent` and `AUTO_ROUTES` exports.
 - `/state` exposes the catalogue for the new surfaces: `acts` (id/zh/en/applies) and `routes`.
 - Client: `自动 | 高级` view switch above the type tabs (remembered as `view` in
-  `dsh-prompt-enhance.prefs`, default `auto`); the auto view shows the recognized intent, three
+  `dsh-prompt-enhance-ultra.prefs`, default `auto`); the auto view shows the recognized intent, three
   candidate cards with provenance labels (`方法论路线` / `角色路线` / `结构路线` + the route's
   house style or act role), a `使用这组` write-back and a `复制` action per candidate; a failed
   route shows `该路线生成失败` instead of vanishing while the others complete.
@@ -133,7 +255,7 @@ persistently, without touching the harness language.
   `LANGUAGE_LABELS`; clicking one re-renders the whole panel in that language with no page reload.
 - The first run follows the harness language (`ctx.get('locale').getLocale().active`), so an English
   harness starts in English; the user's pick is then stored under `lang` in
-  `dsh-prompt-enhance.prefs` and wins on every later load.
+  `dsh-prompt-enhance-ultra.prefs` and wins on every later load.
 - Three tests: `both languages carry the same copy` (key sets must match), `a stored language switches
   the whole interface`, `the language follows the harness until the user picks one`.
 
@@ -211,7 +333,7 @@ Third family, documentation mode.
 - Documentation family (文档): `doc-fill` reads the current document's heading outline and
   formatting traits and rewrites the prompt so the model fills the gaps inside that structure;
   `doc-draft` drafts a document-type skeleton when there is nothing to read.
-- `GET /prompt-enhance/api/documents` lists readable documents, ranks them by prompt relevance,
+- `GET /prompt-enhance-ultra/api/documents` lists readable documents, ranks them by prompt relevance,
   sub-directory, `docs/`, recency and size, and returns the outline plus formatting traits of the
   document that would be read. `POST /enhance` accepts `docPath` and reports
   `documentPath` / `documentChars` / `documentHeadings` in the `meta` event.
@@ -246,7 +368,7 @@ First public release.
 - Two code focus areas, multi-select: framework completeness and security review.
 - Adaptive methodology selection across four upstream prompt-engineering projects
   (Superpowers, Prompt Optimizer, LangGPT, AiShort), plus manual override.
-- Host HTTP API under `/prompt-enhance/api`: `GET /state`, `GET /workspace`,
+- Host HTTP API under `/prompt-enhance-ultra/api`: `GET /state`, `GET /workspace`,
   `POST /enhance` (SSE), `POST /cancel`, `POST /presence`.
 - Workspace collector: directory tree, manifest summary, prioritised excerpts and a
   10-rule heuristic security scan.

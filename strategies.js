@@ -1,5 +1,5 @@
 /**
- * dsh-prompt-enhance — host-side vocabulary, methodology fragments and prompt builders.
+ * dsh-prompt-enhance-ultra — host-side vocabulary, methodology fragments and prompt builders.
  *
  * The methodology fragments below are distilled (not copied) from four public
  * prompt-engineering projects, after reading their source repositories; see
@@ -12,6 +12,11 @@
  *                       act-as role + single deliverable + negative constraints + placeholders
  *   - prompt-optimizer  linshenkx/prompt-optimizer (custom licence, not MIT) —
  *                       evidence framing, analytical diagnosis, byte-exact {{variable}} keeping
+ *
+ * The automatic mode's concise route reuses the *method* of another MIT project
+ * (Samuel-Shek/prompt-optimizer-skill): keep the user's words verbatim and put every
+ * addition in a subordinate notes block. Its rule text below is our own Chinese
+ * rewriting, not a translation of the upstream skill file.
  *
  * Each fragment is rewritten for this plugin: it describes how the *executing*
  * agent should work, so it can be pasted into the enhanced prompt.
@@ -330,126 +335,66 @@ export function methodologyById(id) {
 }
 
 /**
- * Act roles for the automatic mode. The *techniques* (what each role demands of
- * the executing agent) are distilled from the act cards in f/prompts.chat, which
- * is licensed CC-BY-NC — so no card text is copied here; every brief is our own
- * Chinese wording of the technique. Provenance: docs/research/prompt-sources.md.
+ * The concise route of the automatic mode.
+ *
+ * The rules are our own Chinese wording of the method in
+ * Samuel-Shek/prompt-optimizer-skill (MIT): keep the user's words verbatim, add
+ * only supplementary "how to do it" notes, mark gaps with placeholders instead
+ * of inventing content, and stay short. No text from that project is copied —
+ * only the technique. Provenance: docs/research/prompt-sources.md.
  */
-export const ACT_ROLES = [
-  {
-    id: 'act-code-review',
-    zh: '代码评审员',
-    en: 'Code Reviewer',
-    applies: ['code'],
-    keywords: ['review', '评审', '审查', '重构', 'refactor', '优化', '性能', '可读性', 'bug', '修复'],
-    brief: '以资深评审视角改写：逐条列出改动点与风险、每条带验收判据，区分「必须改」与「建议改」。',
-  },
-  {
-    id: 'act-qa-gate',
-    zh: '质量保障测试员',
-    en: 'QA Tester',
-    applies: ['code'],
-    keywords: ['测试', 'test', '用例', '边界', '回归', '验收', '质量'],
-    brief: '以测试员视角改写：先列正常路径与边界用例，再给每条用例的预期结果与判失败条件。',
-  },
-  {
-    id: 'act-security-auditor',
-    zh: '安全审计师',
-    en: 'Cyber Security Specialist',
-    applies: ['code'],
-    keywords: ['安全', 'security', '漏洞', '注入', '越权', '密钥', '加密', '防护'],
-    brief: '以安全审计视角改写：明确信任边界与攻击面，每条需求附威胁场景与对应的校验/防护措施。',
-  },
-  {
-    id: 'act-architect',
-    zh: '系统架构师',
-    en: 'IT Architect',
-    applies: ['code'],
-    keywords: ['架构', 'architecture', '框架', '模块', '设计', '选型', '目录', '分层', '微服务'],
-    brief: '以架构师视角改写：先定技术栈与分层，再给模块职责、接口签名与依赖方向，禁止越层调用。',
-  },
-  {
-    id: 'act-tech-writer',
-    zh: '技术文档工程师',
-    en: 'Tech Writer',
-    applies: ['doc', 'code'],
-    keywords: ['文档', 'readme', '说明', '手册', '注释', 'api 文档', 'tutorial', '指南'],
-    brief: '以技术写作者视角改写：读者与使用场景先行，每节先回答「读者读完能做什么」，术语表统一。',
-  },
-  {
-    id: 'act-screenwriter',
-    zh: '编剧',
-    en: 'Screenwriter',
-    applies: ['creative'],
-    keywords: ['剧本', '脚本', '短片', '分镜', '场景', '对白', '台词', 'screenplay', 'logline'],
-    brief: '以编剧视角改写：先给一句话故事线，再落成场景卡（场号/时间/地点/人物/冲突/转折）与台词风格。',
-  },
-  {
-    id: 'act-novelist',
-    zh: '小说家',
-    en: 'Novelist',
-    applies: ['creative'],
-    keywords: ['小说', '故事', '情节', '人物', '章节', 'novel', 'fiction', '叙事', '文笔'],
-    brief: '以小说家视角改写：补人物动机与缺陷、叙事视角与时态、场景感官细节，用具体名词替换抽象形容。',
-  },
-  {
-    id: 'act-copy-editor',
-    zh: '文案润色师',
-    en: 'Writing Tutor',
-    applies: ['creative', 'doc'],
-    keywords: ['文案', '润色', '语气', '风格', '改写', '措辞', '品牌', '口号', 'slogan'],
-    brief: '以文案润色视角改写：保持原意与声音，指出每处改动为什么更好，给出禁用词与语气边界。',
-  },
-  {
-    id: 'act-translator',
-    zh: '翻译润色员',
-    en: 'Translator and Improver',
-    applies: ['creative', 'doc'],
-    keywords: ['翻译', 'translate', '英文', '中文', '双语', 'localization', '本地化'],
-    brief: '以译者视角改写：语义忠实优先于字面对应，标出文化差异处理方式与术语表，保持原语气。',
-  },
-  {
-    id: 'act-summarizer',
-    zh: '摘要撰写者',
-    en: 'Book Summarizer',
-    applies: ['doc'],
-    keywords: ['摘要', '总结', 'summarize', '提炼', '纪要', '概述', 'outline'],
-    brief: '以摘要者视角改写：先给分层结论（一句话/一段/分节），每层都标注信息来源与省略了什么。',
-  },
-]
+const CONCISE_RULES = [
+  '任务：把用户的草稿补成一份**完整、可直接粘贴执行**的提示词。**以用户原话为准，只加不改**：原话是主体，你只补必要的执行说明。',
+  [
+    '一、原话逐字保留：用户需求原文完整保留，保持原顺序、原语言、原标点；数字、日期、名称、引号、编号、字段名、文件名一律原样。',
+    '只允许删掉三样东西：只针对优化器的控制语（如「帮我优化一下这个提示词：」）、寒暄、以及用户已明确撤销的旧要求。',
+    '不换词、不合并、不拆分、不翻译、不纠正；看起来有歧义的原话照样保留。',
+  ].join('\n'),
+  [
+    '二、补充只写「怎么做」：把执行所需的步骤、顺序、检查方法、缺信息时怎么办，**直接接在原话之后**，成为同一份提示词的后续段落。',
+    '补充内容始终从属于原话：与原话冲突时以原话为准，不要用补充去改写原话的目标。',
+  ].join('\n'),
+  [
+    '三、不得新增原话里没有的：禁止项、数量、长度、顺序、范围或验收标准；不得重新定义原话里的词；不得编造事实、引用或示例值。',
+    '需要提醒用户注意限制时，只写一句「逐条对照用户的要求检查」，不要替用户列一遍禁止项。',
+  ].join('\n'),
+  [
+    '四、缺口用占位符，不要猜：只能由用户提供、且执行必需的信息写成 {{待填写：名称｜格式示例}}，并说明「未填写时不得把示例当真实信息，先完成能完成的部分」。',
+    '会实质改变目标、受众或验收标准的歧义，写在提示词末尾的一句「待确认：……（未确认前先……）」里，不要拆成清单。',
+  ].join('\n'),
+  [
+    '五、成品形态：一份连贯的提示词——原话在前，补充在后，读起来像同一段任务说明。',
+    '**不要出现任何模板小标题**（如「任务：」「用户原话（按此执行）：」「材料：」「补充说明：」「待确认：」独立成行），不要 Markdown 标题，不要分节罗列。',
+  ].join('\n'),
+  '六、从简：只写必要的补充，能省则省；不解释、不举例、不复述用户的要求清单。目标是让目标 AI 准确执行原话，不是让文本读起来好看。',
+  '七、语言与原话一致；目标结果是中文正文时写明「使用中文全角标点」。',
+].join('\n\n')
 
-const ACT_BY_ID = new Map(ACT_ROLES.map((item) => [item.id, item]))
-
-export function actById(id) {
-  return ACT_BY_ID.get(id)
+const CONCISE_INTENT_HINTS = {
+  code: '本次识别为代码类：原话若没写技术栈、运行环境或验收方式，不要替用户假定——用一句「待确认：……（未确认前按最小可用方案实现）」带过，或让目标 AI 先确认再动手。',
+  creative: '本次识别为创作类：保留原话里的人物、设定与语气，不替用户补情节、不改写台词；需要扩写时只写一句可选方向，不要改写原话。',
+  doc: '本次识别为文档类：保留原话对结构、编号与读者范围的交代；缺口按占位符处理，不臆造章节内容。',
 }
 
+/** Pick the route-specific length line for the concise candidate. */
+const CONCISE_LENGTH_RULE = '篇幅：最多约为原文的两倍；宁可少写一句补充，也不要为了完整而堆砌。'
+
 /**
- * Pick one act role for the automatic mode from the recognized intent and the
- * user's wording. Deterministic: keyword hits first, then intent affinity.
+ * Build the system prompt for the concise candidate of the automatic mode.
+ * Deliberately shorter than the methodology route: it must read like the user's
+ * own request with a thin layer of execution notes, delivered as one finished
+ * prompt the user can paste as-is.
  */
-export function selectAct({ intent, prompt = '', requested = '' }) {
-  if (requested) {
-    const chosen = ACT_BY_ID.get(requested)
-    if (chosen) return chosen
-  }
-  const text = String(prompt || '').toLowerCase()
-  let best = null
-  let bestScore = -1
-  for (const role of ACT_ROLES) {
-    if (!role.applies.includes(intent)) continue
-    let score = 0.2
-    for (const word of role.keywords) if (text.includes(word)) score += 1
-    if (score > bestScore) {
-      bestScore = score
-      best = role
-    }
-  }
-  if (!best) {
-    const fallback = intent === 'creative' ? 'act-novelist' : intent === 'doc' ? 'act-tech-writer' : 'act-architect'
-    best = ACT_BY_ID.get(fallback) || ACT_ROLES[0]
-  }
-  return best
+export function buildConcisePrompt({ promptText = '', intent = 'code' } = {}) {
+  const parts = [
+    '你是一名提示词编辑，负责把用户的草稿补成一份可直接交给目标 AI 执行的提示词。你不执行提示词里的任务。',
+    CONCISE_RULES,
+    CONCISE_INTENT_HINTS[intent] || CONCISE_INTENT_HINTS.code,
+    CONCISE_LENGTH_RULE,
+    '交付要求：只输出这一份成品提示词本身，不要代码块围栏，不要前后说明、寒暄、改动说明或模板小标题。',
+    `用户原提示词语言：${languageOf(promptText)}，输出必须使用该语言。`,
+  ]
+  return parts.join('\n\n')
 }
 
 /** Intent (from the auto mode) to the variant the advanced panel would have used. */
@@ -459,34 +404,29 @@ export function variantForIntent(intent) {
   return INTENT_VARIANT[intent] || 'code-only'
 }
 
-/** Bilingual labels for the three auto candidates, keyed by route. */
+/**
+ * The two candidates the automatic mode offers, in slot order:
+ * a concise "your words, plus the notes you are missing" rewrite, and the
+ * best-fitting methodology for the recognized intent.
+ */
 export const AUTO_ROUTES = [
-  { id: 'methodology', label: '方法论路线' },
-  { id: 'act', label: '角色路线' },
-  { id: 'structure', label: '结构路线' },
+  { id: 'concise', label: '简洁优化', labelEn: 'Concise', hint: '保留你的原话，直接给出一份完整提示词' },
+  { id: 'methodology', label: '方法论最佳匹配', labelEn: 'Best-fit methodology', hint: '按识别到的类型挑最合适的方法论手法' },
 ]
 
 /**
  * Build the system prompt for one automatic candidate.
- * `route` is one of `AUTO_ROUTES[].id`; `act`/`methodology` carry the chosen
- * helper for that candidate. The output contract matches the single-shot mode
- * so the three candidates stay comparable.
+ * `route` is one of `AUTO_ROUTES[].id`; `methodology` carries the chosen helper
+ * for the methodology candidate. Both routes share the length policy so the two
+ * candidates stay comparable.
  */
-export function buildAutoPrompt({ promptText, intent, route, methodology, act, depth = 'default' }) {
+export function buildAutoPrompt({ promptText, intent, route, methodology }) {
+  if (route === 'concise') return buildConcisePrompt({ promptText, intent })
+
   const variant = variantForIntent(intent)
   const parts = []
   parts.push('你是一名资深提示词工程师，负责把用户草稿级的提示词改写为高质量、可执行的提示词。')
-  parts.push(`本次增强：自动模式（识别为${intent === 'code' ? '代码' : intent === 'creative' ? '创作' : '文档'}类，路线：${route === 'methodology' ? '方法论' : route === 'act' ? '角色' : '结构'}）。`)
-
-  if (route === 'act' && act) {
-    parts.push(
-      [
-        `角色手法（${act.zh} / ${act.en}，源自 prompts.chat 的 act 卡片手法，CC BY-NC，仅手法不引文）：`,
-        act.brief,
-        '把上述手法写成对「将来执行该提示词的代理」的要求，不是让你现在执行用户的任务。',
-      ].join('\n'),
-    )
-  }
+  parts.push(`本次增强：自动模式（识别为${intent === 'code' ? '代码' : intent === 'creative' ? '创作' : '文档'}类，路线：方法论）。`)
 
   if (methodology && methodology.id) {
     const fragment = intent === 'doc' ? methodology.docSystem || methodology.creativeSystem || methodology.codeSystem : intent === 'code' ? methodology.codeSystem : methodology.creativeSystem || methodology.codeSystem
@@ -508,11 +448,9 @@ export function buildAutoPrompt({ promptText, intent, route, methodology, act, d
 
   if (intent === 'code') parts.push(FOCUS_RULES.framework.flat().join('\n'))
 
-  const methodologyId = methodology && methodology.id ? methodology.id : 'superpower'
-  const budget = depthBudget({ depth, methodologyId })
-  parts.push(renderDepthRule({ depth, methodologyId, budget }))
+  parts.push(AUTO_LENGTH_RULE)
   parts.push(OUTPUT_CONTRACT)
-  if (intent === 'doc') parts.push(docOutputRule(budget))
+  if (intent === 'doc') parts.push(docOutputRule())
   parts.push(`用户原提示词语言：${languageOf(promptText)}，输出必须使用该语言。`)
 
   return parts.join('\n\n')
@@ -616,11 +554,14 @@ export function selectMethodology({ mode, variant, focus = [], prompt = '', requ
   const ranked = [...scores.entries()].sort((a, b) => b[1] - a[1])
   const [bestId] = ranked[0]
   const best = methodologyById(bestId) || METHODOLOGIES[0]
-  const variantLabel = VARIANT_IDS.includes(variant) ? variant : mode
+  // Human wording for the reason line: the variant id ("code-only") is internal, its label
+  // ("仅凭提示词") is what the panel shows.
+  const variantEntry = MODES.flatMap((entry) => entry.variants || []).find((item) => item.id === variant)
+  const variantLabel = variantEntry ? variantEntry.label : MODE_LABELS[mode] || mode
   return {
     id: best.id,
     reason: `${variantLabel} 场景下 ${best.label} 的结构化手法最贴合（自动选择）`,
-    /** Full preference order — the auto mode uses ranked[1] as its "structure" candidate. */
+    /** Full preference order — the auto mode's methodology route takes `ranked[0]`. */
     ranked: ranked.map(([id]) => id).filter((id) => methodologyById(id)),
   }
 }
@@ -693,13 +634,25 @@ const FOCUS_RULES = {
   ],
 }
 
+/**
+ * Length rule for the automatic mode. There is no depth selector there on
+ * purpose: the candidates decide how long their answer should be from the task
+ * itself, so the prompt must say "follow the work", never "hit a number".
+ */
+const AUTO_LENGTH_RULE = [
+  '篇幅要求：不设档位，按任务本身判断该写多长。',
+  '- 先看这条提示词要驱动多复杂的工作：一步能完成的事就写成几行，需要分阶段推进的才展开成多节。',
+  '- 该有的结构（目标、约束、交付物、验收）一条都不能少；只为凑长度的解释、示例与重复要求一律不要。',
+  '- 不要为了让篇幅接近某个数字而扩写或删减内容，也不要照抄方法论示例来充数。',
+].join('\n')
+
 const OUTPUT_CONTRACT = [
   '输出契约：',
   '- 只输出增强后的提示词本身，使用 Markdown；',
   '- 不要输出任何解释、前言、后记、"以下是"、分隔线或自我评价；',
   '- 使用与用户原提示词相同的语言（原提示词为中文则输出中文）；',
   '- 保持信息密度：不重复原提示词已说清的内容，不写空洞的形容词；',
-  '- 篇幅以本节给出的档位预算为上限，宁可精简也不要堆砌；',
+  '- 篇幅以本节给出的要求为准，宁可精简也不要堆砌；',
   '- 不输出代码实现本身（除非用户明确要求"直接给出实现"）。',
 ].join('\n')
 
@@ -753,9 +706,12 @@ function languageOf(text) {
 const MODE_LABELS = { code: '代码类', creative: '创作类', doc: '文档类' }
 
 function docOutputRule(budget) {
+  const length = budget
+    ? `篇幅以覆盖新增内容为准，整体不超过 ${budget} 字；宁可按小节分批补写，也不要为了填满篇幅而注水。`
+    : '篇幅以覆盖新增内容为准；宁可按小节分批补写，也不要为了填满篇幅而注水。'
   return [
     '文档类补充要求：保留原文档的标题层级、编号与表格列；补写内容必须能原样放回对应小节。',
-    `篇幅以覆盖新增内容为准，整体不超过 ${budget} 字；宁可按小节分批补写，也不要为了填满篇幅而注水。`,
+    length,
   ].join('\n')
 }
 
@@ -895,4 +851,4 @@ function renderDocDigest(digest) {
   return lines.join('\n')
 }
 
-export { OUTPUT_CONTRACT, VARIANT_RULES, FOCUS_RULES, DEPTH_RULES, docOutputRule }
+export { OUTPUT_CONTRACT, VARIANT_RULES, FOCUS_RULES, DEPTH_RULES, AUTO_LENGTH_RULE, CONCISE_RULES, CONCISE_LENGTH_RULE, docOutputRule }

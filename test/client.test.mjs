@@ -48,7 +48,7 @@ function loadPlugin(options = {}) {
       addEventListener: () => {},
       removeEventListener: () => {},
       localStorage: {
-        getItem: (key) => (key === 'dsh-prompt-enhance.prefs' ? stored : null),
+        getItem: (key) => (key === 'dsh-prompt-enhance-ultra.prefs' ? stored : null),
         setItem: () => {},
         removeItem: () => {},
       },
@@ -105,7 +105,7 @@ function walk(node, out = { tags: [], classes: [], texts: [] }) {
 
 test('module registers itself against the DSH module loader', () => {
   const { definition } = instantiate()
-  assert.equal(definition.id, 'dsh-prompt-enhance')
+  assert.equal(definition.id, 'dsh-prompt-enhance-ultra')
   assert.equal(typeof definition.factory, 'function')
 })
 
@@ -136,7 +136,7 @@ test('component is registered on the composer control row', () => {
   const register = seen.find((entry) => entry[0] === 'register')
   assert.ok(register, 'component should be registered')
   assert.equal(register[1], 'conversation.input.right')
-  assert.equal(register[2], 'prompt-enhance-trigger')
+  assert.equal(register[2], 'prompt-enhance-ultra-trigger')
   assert.equal(register[3], 20)
   assert.equal(register[4], 'function')
 })
@@ -264,7 +264,7 @@ test('browser half obeys the plugin rules', () => {
   assert.equal(/\bdocument\.querySelector\(/.test(source), false, 'must not read other plugins through the DOM')
   assert.ok(source.includes('--dsw-alias-'), 'styles should use theme tokens')
   assert.ok(source.includes("'conversation.input.right'"), 'slot name lives in source')
-  assert.ok(source.includes('dsh-prompt-enhance.prefs'), 'preferences key is namespaced')
+  assert.ok(source.includes('dsh-prompt-enhance-ultra.prefs'), 'preferences key is namespaced')
 })
 
 test('panel styles follow the harness styling rules', () => {
@@ -310,6 +310,39 @@ test('the panel claims the top layer and follows the window', () => {
   assert.ok(/\.dpe-panel\s*\{[^}]*box-sizing:\s*border-box/.test(css), 'padding counts against max-height')
 })
 
+test('streamed answers reach the panel without freezing it', () => {
+  // The SSE dispatcher calls handlers by event name; `onDelta`-style keys never
+  // fire, which used to leave the advanced view stuck on "running".
+  assert.ok(!/onDelta\s*:/.test(source), 'no onDelta-style handler keys are left behind')
+  assert.ok(!/onDone\s*:/.test(source), 'no onDone-style handler keys are left behind')
+  assert.ok(source.includes('delta: (payload) =>'), 'the delta handler uses the event name')
+  assert.ok(source.includes('flushDeltas'), 'buffered text is flushed before a route settles')
+  // Deltas are batched per frame instead of re-rendering per token.
+  assert.ok(source.includes('requestAnimationFrame'), 'streamed text is applied once per frame')
+  assert.ok(source.includes('pendingAdvanced'), 'the advanced stream uses a frame buffer')
+  assert.ok(source.includes('cancelAnimationFrame'), 'a pending frame is cancelled when a route ends')
+  // Measurements are coalesced and the height is frozen while a run streams.
+  assert.ok(source.includes('requestPlacement'), 'placement measurements are coalesced')
+  assert.ok(source.includes('ResizeObserver'), 'content growth is observed instead of measured per render')
+  assert.ok(source.includes('frozenHeightRef'), 'the panel keeps its height while a run streams')
+  assert.ok(!/useLayoutEffect\(\(\) => \{\s*if \(open\) recomputePlacement\(\)\s*\}\)/.test(source), 'no measure-after-every-render effect')
+})
+
+test('the auto view can render while a run is streaming', () => {
+  // Regression: `autoBody` used `runningHint` before its `const` declaration, so
+  // the first auto run crashed the whole slot ("ReferenceError: Cannot access
+  // 'runningHint' before initialization") and the panel vanished from the page.
+  const hintAt = source.indexOf('const runningHint')
+  const autoAt = source.indexOf('const autoBody')
+  const bodyAt = source.indexOf('let body = null')
+  assert.ok(hintAt >= 0, 'the running hint exists')
+  assert.ok(autoAt >= 0 && bodyAt >= 0, 'both views exist')
+  assert.ok(hintAt < autoAt, 'the running hint is declared before the auto view uses it')
+  assert.ok(hintAt < bodyAt, 'the running hint is declared before the advanced view uses it')
+  assert.equal(source.split('const runningHint').length - 1, 1, 'the hint is declared exactly once')
+})
+
+
 test('browser half offers the automatic mode', () => {
   assert.ok(source.includes("VIEW_CHOICES = ['auto', 'advanced']"), 'the auto and advanced views are a pair')
   assert.ok(source.includes("tabAuto: '自动'"), 'the auto tab has a label')
@@ -327,18 +360,20 @@ test('browser half offers the automatic mode', () => {
 
 test('the auto view shows candidates while the advanced view keeps its rows', () => {
   // The panel mounts only when open; assert the view switch in source instead.
-  assert.ok(source.includes("view === 'auto' ? autoBody :"), 'the auto view takes over the panel body')
-  assert.ok(
-    source.includes("[tabs, cards, focusRow, depthRow, methodRow, workspaceNote, documentNote]"),
-    'the advanced view keeps the classic rows',
-  )
-  assert.ok(source.includes("view === 'advanced' ? body : null"), 'the advanced body stays in its view')
+  assert.ok(source.includes("view === 'auto'"), 'the auto view takes over the panel body')
+  assert.ok(source.includes("view === 'advanced' ? h('div', { className: 'dpe-section' }, body) : null"), 'the advanced body sits in its own section')
+  const advanced = source.slice(source.indexOf("{ className: 'dpe-section' },\n                tabs"), source.indexOf('view === \'advanced\' ? h(\'div\''))
+  for (const row of ['tabs', 'cards', 'focusRow', 'depthRow', 'methodRow', 'workspaceNote', 'documentNote']) {
+    assert.ok(advanced.includes(row), `the advanced section keeps ${row}`)
+  }
   assert.ok(source.includes('autoBody'), 'the auto body exists')
   assert.ok(source.includes('LABELS.autoStart'), 'the auto action is labelled')
   assert.ok(source.includes('LABELS.autoHint'), 'the auto view explains itself')
   assert.ok(source.includes("id === 'auto' ? LABELS.tabAuto : LABELS.tabAdvanced"), 'view tabs switch by id')
-  // The depth selector is shared between both views.
-  assert.ok(source.includes('autoBody = h(') && source.includes('depthRow,') , 'depth stays reachable in auto')
+  // The automatic mode has no length level: only the advanced view offers one.
+  const autoBody = source.slice(source.indexOf('const autoBody = h('), source.indexOf('const panelStyle'))
+  assert.equal(autoBody.includes('depthRow'), false, 'the auto view leaves the length row out')
+  assert.ok(source.includes("beat('auto-start', 'length:auto')"), 'the auto run reports that length is automatic')
 })
 
 test('the auto candidates carry provenance labels', () => {

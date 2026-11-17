@@ -12,7 +12,7 @@ README 里用到的图，两类：
 | --- | --- | --- |
 | `ui-composer.png` | README 顶部 hero、`界面一览 / At a glance` | `generate-mockups.py` |
 | `ui-panel.png` | 面板 idle 态（代码大类）：自动/高级视图切换 / 三个大类 tab / 两种方式 / 方向 / 档位 / 方法论 / 工作区 | `generate-mockups.py` |
-| `ui-auto.png` | 面板自动视图（默认态）：自动|高级切换、开始自动优化、需求识别行、三条候选卡（方法论/角色/结构路线，各带使用这组/复制）与档位 | `generate-mockups.py`；文案需与 `client.js` 的 `tabAuto` / `autoStart` / `autoCandidates` / `autoUse` 等 COPY 键一致 |
+| `ui-auto.png` | 面板自动视图（默认态）：自动|高级切换、开始自动优化、需求识别行、两条候选卡（简洁优化·原话为准 + 方法论最佳匹配，各带使用这组/复制）；无档位行——篇幅随任务 | `generate-mockups.py`；文案需与 `client.js` 的 `tabAuto` / `autoStart` / `autoCandidates` / `autoUse` 等 COPY 键一致 |
 | `ui-panel-doc.png` | 面板「文档」大类态：读文档后补写 / 按类型起草、文档信息块（字数、标题数、大纲、候选下拉、刷新）、档位、方法论与增强按钮 | `generate-mockups.py` |
 | `ui-result.png` | 面板 done 态：可编辑结果、四种落盘、元信息 | `generate-mockups.py` |
 | `ui-language-zh.png` | `界面语言 / Interface language`：中文面板（真截图） | 无（截图，来自测试台） |

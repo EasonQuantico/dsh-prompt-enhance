@@ -1,8 +1,8 @@
-# dsh-prompt-enhance
+# dsh-prompt-enhance-ultra
 
 > 在 DSH 对话框里，把一句草稿变成一份能直接执行的提示词。
 
-[![CI](https://github.com/EasonQuantico/dsh-prompt-enhance/actions/workflows/ci.yml/badge.svg)](https://github.com/EasonQuantico/dsh-prompt-enhance/actions/workflows/ci.yml)
+[![CI](https://github.com/EasonQuantico/dsh-prompt-enhance-ultra/actions/workflows/ci.yml/badge.svg)](https://github.com/EasonQuantico/dsh-prompt-enhance-ultra/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-3c873a.svg)](package.json)
 [![Dependencies](https://img.shields.io/badge/runtime%20deps-none-brightgreen.svg)](package.json)
@@ -19,7 +19,7 @@ DSH（DeepSeek Harness）插件。在输入框右侧加一个 **✨ 提示词增
 - **三档篇幅**：简洁 / 默认 / 严谨，同一请求可以只留三行，也可以给到完整结构与验收清单。
 - **只写回输入框**，不自动发送消息；所有工作区访问都是只读。
 
-![提示词增强按钮：输入框右侧的 ✨ 按钮，点开选代码/创作/文档、增强方式与篇幅档位](docs/images/ui-composer.png)
+![提示词增强按钮：输入框右侧的 ✨ 按钮，点开是自动候选或高级面板](docs/images/ui-composer.png)
 
 [English README](README.en.md) · [内部契约](CONTRACT.md) · [安全策略](SECURITY.md) · [变更记录](CHANGELOG.md)
 
@@ -31,7 +31,7 @@ DSH（DeepSeek Harness）插件。在输入框右侧加一个 **✨ 提示词增
 - [界面一览](#界面一览)
 - [自动模式](#自动模式)
 - [三种增强方式](#三种增强方式)
-- [档位：三种篇幅](#档位三种篇幅)
+- [档位：三种篇幅（高级视图）](#档位三种篇幅高级视图)
 - [方法论自适应](#方法论自适应)
 - [安装](#安装)
 - [使用](#使用)
@@ -52,15 +52,15 @@ DSH（DeepSeek Harness）插件。在输入框右侧加一个 **✨ 提示词增
 | 能力 | 说明 |
 | --- | --- |
 | 常驻按钮 | 输入框右侧控件行一枚药丸按钮，hero 与会话内两种输入形态都在 |
-| 自动模式 | 面板默认停在「自动」视图：自动识别草稿属于代码 / 创作 / 文档哪类，给三组带来源标注的候选（方法论路线 / 角色路线 / 结构路线），选一组回填 |
+| 自动模式 | 面板默认停在「自动」视图：自动识别草稿属于代码 / 创作 / 文档哪类，给两组带来源标注的候选（简洁优化 · 原话为准 / 方法论最佳匹配），选一组回填 |
 | 三类六式 | 高级视图保留代码类（读工作区 / 仅凭提示词）、创作类（补充丰富 / 结构严谨）、文档类（读文档后补写 / 按类型起草） |
 | 双优化方向 | 代码类可多选「完善开发框架」「审查安全性」，至少一项 |
-| 三档篇幅 | 简洁 / 默认 / 严谨：同一请求按档位给字数预算，四家方法论各自按实测比例缩放 |
-| 方法论自适应 | 四套上游手法 + `auto` 打分，也可在下拉里手动指定；自动模式的三条路线里两条直接用它排序 |
-| 角色手法库 | 十个 act 角色（代码评审、QA、安全审计、架构师、技术写作、编剧、小说家、文案润色、翻译、摘要）源自 prompts.chat 的手法卡片（CC BY-NC，只取手法不引文） |
+| 三档篇幅 | 高级视图里选简洁 / 默认 / 严谨：同一请求按档位给字数预算，四家方法论各自按实测比例缩放；自动视图不设档位，篇幅随任务 |
+| 方法论自适应 | 四套上游手法 + `auto` 打分，也可在下拉里手动指定；自动模式的两条路线里，方法论那条直接用它排序 |
+| 简洁优化 | 「原话为准，只加不改」：逐字保留你的原话，另起「补充说明」区只写怎么做，缺口留占位符，不新增你没提的约束（手法参考 MIT 许可的 prompt-optimizer-skill） |
 | 工作区证据 | 目录树、清单摘要、优先级文件摘录、10 条启发式安全命中 |
 | 文档框架 | 文档类先读标题大纲与格式特征（层级、表格、列表、编号、段落长度），补写不越出原结构 |
-| 流式反馈 | SSE 增量显示，先显示「模型正在思考…（N 字）」再逐字出结果；自动模式三条路线并行占位、逐条完成 |
+| 流式反馈 | SSE 增量显示，先显示「模型正在思考…（N 字）」再逐字出结果；自动模式两条路线各自占位、逐条完成 |
 | 一键落盘 | 替换输入框 / 插入到光标 / 复制 / 再试一次，结果区可直接编辑 |
 | 偏好记忆 | 上次的视图、大类、方式、方向、档位、方法论、文档记在 `localStorage` |
 | 诊断面包屑 | 浏览器半把挂载/打开/开始/回填事件上报到宿主，便于无控制台排查 |
@@ -78,16 +78,17 @@ DSH（DeepSeek Harness）插件。在输入框右侧加一个 **✨ 提示词增
 - **② 常驻按钮** —— 挂在 `conversation.input.right` 槽位，hero（新建会话）与会话内两种输入形态都在；
   草稿为空也能点，因为它增强的是「你接下来要写的东西」。
 
-### 自动：默认视图，三组候选
+### 自动：默认视图，两组候选
 
-![自动视图：自动|高级切换、需求识别行、三条候选卡与档位](docs/images/ui-auto.png)
+![自动视图：自动|高级切换、需求识别行与两条候选卡](docs/images/ui-auto.png)
 
 - **① 需求识别** —— 先判断草稿属于代码 / 创作 / 文档，给出一句话摘要；模型答不上时回落关键词，
   界面会标明来源。
-- **② 三条候选路线** —— 方法论 / 角色 / 结构各出一路，每张卡都标着「路线 · 手法」与选择理由。
-- **③ 生成中可见** —— 每条路线独立占位：流式刷新、完成打勾、失败标红；一条失败不影响其余。
-- **④ 选一组回填** —— 「使用这组」把候选写回输入框，「复制」进剪贴板；三条互不影响。
-- **⑤ 档位同样生效** —— 简洁 / 默认 / 严谨在自动视图共用同一预算。
+- **② 两条候选路线** —— 「简洁优化」保留原话、只补执行说明，「方法论最佳匹配」按识别到的类型挑最合适的一家；每张卡都标着「路线 · 手法」与选择理由。
+- **③ 生成中可见** —— 每条候选独立占位：流式刷新、完成打勾、失败标红；一条失败不影响其余。
+- **④ 选一组回填** —— 「使用这组」把候选写回输入框，「复制」进剪贴板；两条互不影响。
+- **⑤ 不设档位** —— 每组候选自己判断该写多长：小任务几行就够，多阶段任务才展开；不为凑字数扩写，
+  也不为求短删掉必要步骤。要固定篇幅就切到「高级」。
 
 ### 面板：先定大类，再定方式与方向
 
@@ -132,26 +133,27 @@ DSH（DeepSeek Harness）插件。在输入框右侧加一个 **✨ 提示词增
 ## 自动模式
 
 面板顶部是 **自动 | 高级** 一对视图标签，默认停在「自动」。「自动」视图里只有一个开始按钮、
-一行识别结果和三张候选卡：
+一行识别结果和两张候选卡：
 
-1. **需求识别** —— 宿主先用一次小调用（≤400 token，30 秒超时）判断草稿属于 code / creative /
-   doc 哪一类，并给一句话摘要；模型回答不是 JSON 时回落到关键词启发式，识别结果的来源
-   （model / heuristic）会在界面里标出。
-2. **三条候选路线** —— 按识别结果生成三组增强稿：
-   - **方法论路线**：`selectMethodology` 在该意图下得分最高的那家手法；
-   - **角色路线**：从十个 act 角色里按关键词挑一个（代码评审员 / QA 测试员 / 安全审计师 /
-     系统架构师 / 技术文档工程师 / 编剧 / 小说家 / 文案润色师 / 翻译润色员 / 摘要撰写者），
-     再叠上次选方法论；
-   - **结构路线**：同一识别结果换次选方法论再写一遍。
-   每张候选卡都标着「路线 · 手法」与选择理由，生成中的路线占位等待，完成一条亮一条；
-   一条路线失败只标失败，其余照常返回。
+1. **需求识别** —— 宿主先用一次小调用（≤400 token，`callTimeoutMs` 120 秒）判断草稿属于
+   code / creative / doc 哪一类，并给一句话摘要；模型回答不是 JSON 或调用失败时回落到关键词
+   启发式，识别结果的来源（model / heuristic）会在界面里标出。
+2. **两条候选路线** —— 按识别结果生成两组增强稿：
+   - **简洁优化**：参考 [Samuel-Shek/prompt-optimizer-skill](https://github.com/Samuel-Shek/prompt-optimizer-skill)（MIT）
+     的方法——把你的需求原话逐字保留为骨架，只把「怎么做」的执行说明接在后面，
+     **直接给出一份完整、可粘贴的提示词**（不套「任务：/补充说明：」这类模板小标题）；
+     不新增你没提的禁止项、数量或验收标准，缺口用 `{{待填写：名称｜格式示例}}` 占位；
+     篇幅最多约为原文的两倍。
+   - **方法论最佳匹配**：`selectMethodology` 在该意图下得分最高的那家手法（四家之一），
+     把它的结构与写作要求写进提示词。
+   每张候选卡都标着「路线 · 手法」与选择理由，生成中的候选占位等待，完成一条亮一条；
+   一条路线失败只标失败，其余照常返回（超时按路线各自计时，不会拖垮整次运行）。
 3. **选一组回填** —— 「使用这组」把该候选写回输入框（可继续编辑），「复制」进剪贴板；
-   三组候选互不影响，档位旋钮在自动视图里同样生效。
+   两组候选互不影响，篇幅由各自的路线按任务判断，这里没有档位旋钮。
 
-角色手法源自 [f/prompts.chat](https://github.com/f/prompts.chat) 的 act 卡片——该仓库为
-CC BY-NC 许可，本项目只提炼「评审要逐条给验收判据」「编剧先给一句话故事线再落场景卡」这类
-手法，不复制任何卡片原文（出处与许可说明见 `docs/research/prompt-sources.md` 与
-`THIRD_PARTY_NOTICES.md`）。
+「简洁优化」的手法来自 [Samuel-Shek/prompt-optimizer-skill](https://github.com/Samuel-Shek/prompt-optimizer-skill)
+（MIT）：本项目只借鉴它的「原话为准、只加不改」规则，提示词文本自行改写，不复制其原文；
+写法出处见 `docs/research/prompt-sources.md` 与 `THIRD_PARTY_NOTICES.md`。
 
 ## 三种增强方式
 
@@ -173,10 +175,12 @@ CC BY-NC 许可，本项目只提炼「评审要逐条给验收判据」「编�
 无论是哪种方式，输出契约都是「只输出增强后的提示词本身」：不写前言、不做解释、保持信息密度，
 并且使用与原提示词相同的语言。
 
-## 档位：三种篇幅
+## 档位：三种篇幅（高级视图）
 
 模型默认爱写长：同一个需求，选错档位就是「三屏」和「三行」的差别。面板里的**档位独立于大类与
-方式**，只回答一个问题——这次要写多长。
+方式**，只回答一个问题——这次要写多长。**自动视图没有档位**：那里的两条候选各自按任务判断篇幅，
+小任务就几行，多阶段任务才展开，不为了凑字数扩写、也不为了求短删步骤；需要可预期的篇幅时再切到
+「高级」用下面的档位表。
 
 | 档位 | 定位 | superpower | prompt-optimizer | LangGPT | AiShort |
 | --- | --- | --- | --- | --- | --- |
@@ -246,7 +250,7 @@ Prompt Optimizer 先删诊断段与对错对照示例。严谨档相反：完整
 `~/.dsh/profiles/<profile>/`）。插件本身没有依赖，不需要 `npm install`。
 
 ```bash
-git clone https://github.com/EasonQuantico/dsh-prompt-enhance.git
+git clone https://github.com/EasonQuantico/dsh-prompt-enhance-ultra.git
 ```
 
 ### 1. profile 清单登记
@@ -257,11 +261,11 @@ git clone https://github.com/EasonQuantico/dsh-prompt-enhance.git
 ```jsonc
 {
   "dependencies": {
-    "dsh-prompt-enhance": "file:/absolute/path/to/dsh-prompt-enhance"
+    "dsh-prompt-enhance-ultra": "file:/absolute/path/to/dsh-prompt-enhance-ultra"
   },
   "dsh": {
     "profile": {
-      "bundles": ["……原有项……", "dsh-prompt-enhance"]
+      "bundles": ["……原有项……", "dsh-prompt-enhance-ultra"]
     }
   }
 }
@@ -269,19 +273,19 @@ git clone https://github.com/EasonQuantico/dsh-prompt-enhance.git
 
 ### 2. 让 profile 能解析到这个包
 
-把 profile 的 `node_modules/dsh-prompt-enhance` 指向你的检出目录（junction / 符号链接即可，
+把 profile 的 `node_modules/dsh-prompt-enhance-ultra` 指向你的检出目录（junction / 符号链接即可，
 不必复制）：
 
 ```powershell
 # Windows
 New-Item -ItemType Junction `
-  -Path "$HOME\.dsh\profiles\<profile>\node_modules\dsh-prompt-enhance" `
-  -Target "C:\absolute\path\to\dsh-prompt-enhance"
+  -Path "$HOME\.dsh\profiles\<profile>\node_modules\dsh-prompt-enhance-ultra" `
+  -Target "C:\absolute\path\to\dsh-prompt-enhance-ultra"
 ```
 
 ```bash
 # macOS / Linux
-ln -s /absolute/path/to/dsh-prompt-enhance ~/.dsh/profiles/<profile>/node_modules/dsh-prompt-enhance
+ln -s /absolute/path/to/dsh-prompt-enhance-ultra ~/.dsh/profiles/<profile>/node_modules/dsh-prompt-enhance-ultra
 ```
 
 ### 3. 让它加载
@@ -291,7 +295,7 @@ ln -s /absolute/path/to/dsh-prompt-enhance ~/.dsh/profiles/<profile>/node_module
   （前提是上一步用的是链接；若 profile 里是副本，见下面的第 5 条）：
 
   ```powershell
-  Add-Content "$HOME\.dsh\profiles\<profile>\cordis.patch.yml" "# reload prompt-enhance $(Get-Date -Format o)"
+  Add-Content "$HOME\.dsh\profiles\<profile>\cordis.patch.yml" "# reload prompt-enhance-ultra $(Get-Date -Format o)"
   ```
 
 - 浏览器半（`client.js`）的更新需要**刷新 Web GUI 页面**：客户端 bundle 在页面加载时拉取。
@@ -299,7 +303,7 @@ ln -s /absolute/path/to/dsh-prompt-enhance ~/.dsh/profiles/<profile>/node_module
 ### 4. 验证
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:<port>/prompt-enhance/api/state
+Invoke-RestMethod http://127.0.0.1:<port>/prompt-enhance-ultra/api/state
 ```
 
 端口每次启动可能不同，以 Web GUI 的地址为准。返回 `ok: true` 且带上 `provider` / `model` /
@@ -307,24 +311,24 @@ Invoke-RestMethod http://127.0.0.1:<port>/prompt-enhance/api/state
 
 卸载：从 `dsh.profile.bundles` 移除包名、删掉依赖与 junction，再触发一次重载。
 
-> 不想用链接？把整个目录复制进 `<profile>/node_modules/dsh-prompt-enhance` 也可以，
+> 不想用链接？把整个目录复制进 `<profile>/node_modules/dsh-prompt-enhance-ultra` 也可以，
 > 代价是每次更新都要重新复制。
 
 ### 5. 更新插件后看不到新功能？
 
 `dsh plugin install` / `pnpm install` 会把 `file:` 依赖**复制**进 profile 的 `node_modules`
 （连文件的修改时间一起保留）。之后你改了检出目录里的代码，profile 里那份副本仍是旧的，
-宿主重启也只会加载旧代码——症状是 `/prompt-enhance/api/state` 的 `version` 比
+宿主重启也只会加载旧代码——症状是 `/prompt-enhance-ultra/api/state` 的 `version` 比
 `package.json` 里的版本旧，`modes` 也缺了新加的大类。
 
 确认与修复：
 
 ```powershell
-$link = "$HOME\.dsh\profiles\<profile>\node_modules\dsh-prompt-enhance"
+$link = "$HOME\.dsh\profiles\<profile>\node_modules\dsh-prompt-enhance-ultra"
 (Get-Item $link).LinkType          # 为空 = 真实目录（陈旧副本）；Junction 才是链接
 Remove-Item $link -Recurse -Force
-New-Item -ItemType Junction -Path $link -Target "C:\absolute\path\to\dsh-prompt-enhance"
-Add-Content "$HOME\.dsh\profiles\<profile>\cordis.patch.yml" "# reload prompt-enhance $(Get-Date -Format o)"
+New-Item -ItemType Junction -Path $link -Target "C:\absolute\path\to\dsh-prompt-enhance-ultra"
+Add-Content "$HOME\.dsh\profiles\<profile>\cordis.patch.yml" "# reload prompt-enhance-ultra $(Get-Date -Format o)"
 ```
 
 等约 10 秒再看 `/state`：`version` 应等于 `package.json` 的版本，`modes` 里应出现
@@ -337,30 +341,31 @@ Add-Content "$HOME\.dsh\profiles\<profile>\cordis.patch.yml" "# reload prompt-en
 2. 点 ✨。默认的「自动」视图会先识别类型，再给三组候选：**方法论路线**、**角色路线**、
    **结构路线**，每张卡都标着出处与理由。
 3. 想自己定就切到「高级」：选 代码 / 创作 / 文档，再选方式；代码类勾选方向（默认两个都勾）。
-4. 「方法论」保持「自适应（推荐）」即可，或手动指定；档位三选一。
+4. 「方法论」保持「自适应（推荐）」即可，或手动指定；档位三选一（自动视图没有档位，篇幅随任务）。
 5. 点 **开始增强**（高级）或 **开始自动优化**（自动）。结果流式出现，可 **替换输入框**、
    **插入到光标**、**复制**、**再试一次**；自动模式每张候选卡有自己的「使用这组 / 复制」。
 
 小贴士：
 
 - 草稿越具体，增强后的提示词越贴近你的意图；一两句就够，插件负责补结构。
-- 自动模式里三条路线一次生成，适合「先看看不同写法再挑」；赶时间就切高级视图直出发。
+- 自动模式里两条路线一次生成，适合「先看看不同写法再挑」；赶时间就切高级视图直出发。
 - `code-read` 面板会显示扫描到的文件数、文件列表与前几条安全命中，先确认它读的是你要的目录。
 - `code-read` 第一次会比较慢（要读工作区 + 模型推理），`deepseek-v4.1-flash` 实测首字节 7–28 秒；
-  自动模式要跑一次识别 + 三条路线，总时长约为单次增强的三倍。
+  自动模式要跑一次识别 + 两条路线，总时长约为单次增强的两倍。
 - `doc-fill` 先看面板里的「文档」一行：路径对不对、字数与标题数是否是你想补写的那篇；
   自动挑选按提示词相关性排序，想换就展开下拉。草稿里写清「补哪一节、补什么」效果最好，
   例如「在 README 的『已知限制』里补上并发与超时两条」。
 - 增强结果只是**写进输入框**，还可以继续编辑，确认后再发送。
-- 档位按需选：**简洁** 适合只要骨架、后面自己填细节（也最省 token）；**严谨** 适合要把活交给别人
-  或别的代理执行。档位只约束篇幅，不改方法论；自动模式的三条路线也吃同一个档位预算。
+- 档位按需选（高级视图）：**简洁** 适合只要骨架、后面自己填细节（也最省 token）；**严谨** 适合要把活
+  交给别人或别的代理执行。档位只约束篇幅，不改方法论；**自动视图不设档位**，两条候选各自按任务
+  决定长短——想要确定的篇幅就把那个候选切到「高级」再按档位跑一次。
 
 ## 界面语言
 
 面板右上角有两颗小胶囊：**中文** 与 **English**。点一下，整个插件的界面文案立刻换语言，不需要刷新页面。
 
 - 第一次运行时跟随 DeepSeek Harness 的界面语言（Harness 是英文就默认英文）；之后以你点过的那个为准。
-- 选择记在这个浏览器的 `dsh-prompt-enhance.prefs` 里（`lang` 字段），刷新、重启都保持。
+- 选择记在这个浏览器的 `dsh-prompt-enhance-ultra.prefs` 里（`lang` 字段），刷新、重启都保持。
 - 只切换**本插件**的文案。DeepSeek Harness 自己的界面语言不跟着变——这是刻意的，插件不该改宿主的设置。
 - 两套文案键完全一致（测试 `both languages carry the same copy` 会校验），按钮、空状态、错误提示都在里面。
 
@@ -373,7 +378,7 @@ Add-Content "$HOME\.dsh\profiles\<profile>\cordis.patch.yml" "# reload prompt-en
 
 ## 配置
 
-`cordis.patch.yml` 里 `prompt-enhance` 那一行的 `config`：
+`cordis.patch.yml` 里 `prompt-enhance-ultra` 那一行的 `config`：
 
 | 键 | 默认 | 说明 |
 | --- | --- | --- |
@@ -388,7 +393,8 @@ Add-Content "$HOME\.dsh\profiles\<profile>\cordis.patch.yml" "# reload prompt-en
 | `maxListedDocuments` | `800` | 文档模式候选排序时遍历的文件数上限 |
 | `maxDocumentChars` | `16000` | 文档模式读取的原文上限，超出会截断并标注 |
 | `maxOutputTokens` | `8000` | 单次增强的输出上限；推理型模型会先吃掉一部分 |
-| `requestTimeoutMs` | `180000` | 单次增强超时 |
+| `callTimeoutMs` | `120000` | **每次 LLM 调用**的超时（意图识别、一次手动增强、自动模式的一个候选路线） |
+| `requestTimeoutMs` | `420000` | **整次运行**的上限：自动模式覆盖意图识别＋两条候选路线 |
 
 所有数值键都会被校验：非正数或非数字回落到默认值。
 
@@ -423,7 +429,7 @@ Add-Content "$HOME\.dsh\profiles\<profile>\cordis.patch.yml" "# reload prompt-en
 | --- | --- |
 | `client.js` | 槽位注册、按钮与面板、SSE 解析、进度显示、回填（`insertText` / `setDraft`） |
 | `index.js` | 三道闸、`/state` `/workspace` `/documents` `/enhance` `/candidates` `/cancel`、`collectWorkspace`、`collectDocument`、`resolveRoute`、SSE |
-| `strategies.js` | 词表、`selectMethodology` 打分、act 角色库与 `selectAct`、`buildSystemPrompt` / `buildAutoPrompt` 拼提示词、`renderDigest` / `renderDocDigest` 证据帧定 |
+| `strategies.js` | 词表、`selectMethodology` 打分、简洁路线的 `buildConcisePrompt`、`buildSystemPrompt` / `buildAutoPrompt` 拼提示词、`renderDigest` / `renderDocDigest` 证据帧定 |
 
 高级视图的数据流：
 
@@ -436,11 +442,12 @@ Add-Content "$HOME\.dsh\profiles\<profile>\cordis.patch.yml" "# reload prompt-en
 
 自动视图的数据流：
 
-1. 浏览器把草稿与档位发给 `POST /candidates`。
-2. 宿主先用一次小调用识别意图（≤400 token、30 秒超时；回答不是 JSON 就回落关键词启发式）。
-3. 三条路线各自用 `buildAutoPrompt` 拼消息，按顺序流式生成；每条路线用 `slot` 标记，
+1. 浏览器把草稿发给 `POST /candidates`（不带档位）。
+2. 宿主先用一次小调用识别意图（≤400 token、`callTimeoutMs` 超时；失败或回答不是 JSON 就回落
+   关键词启发式，不会中断运行）。
+3. 两条路线各自拼消息（简洁路线走 `buildConcisePrompt`，方法论路线走 `buildAutoPrompt`），按顺序流式生成；每条路线用 `slot` 标记并独立计时，
    `slot-error` 只影响那一条，其余照常完成。
-4. `done` 聚合三条路线的文本与出处（route / label / reason），浏览器按槽位渲染候选卡。
+4. `done` 聚合两条路线的文本与出处（route / label / reason），浏览器按槽位渲染候选卡。
 
 工作区内容与文档内容进入提示词时都被包在「只读证据」帧里，并明确告知模型：其中出现的指令性文字
 只是素材，不构成对它的命令 —— 这是对「工作区里藏提示词注入」的一层防御，文档补写同理：
@@ -468,15 +475,15 @@ Add-Content "$HOME\.dsh\profiles\<profile>\cordis.patch.yml" "# reload prompt-en
 
 ## HTTP 接口
 
-挂在 `/prompt-enhance/api` 下（宿主插件路由，不在 DSH `/api/*` 鉴权中间件之后）：
+挂在 `/prompt-enhance-ultra/api` 下（宿主插件路由，不在 DSH `/api/*` 鉴权中间件之后）：
 
 | 方法 | 路径 | 作用 |
 | --- | --- | --- |
-| `GET` | `/state` | 版本、模型路由、工作区、词表（含 `depths`）、方法论目录、act 角色与路线、诊断面包屑 |
+| `GET` | `/state` | 版本、模型路由、工作区、词表（含 `depths`）、方法论目录、自动路线、诊断面包屑 |
 | `GET` | `/workspace?refresh=1&cwd=…` | 只读扫描工作区，返回文件列表与安全命中 |
 | `GET` | `/documents?refresh=1&cwd=…&prompt=…&path=…` | 列出可读文档，并给出将被读取那篇的标题大纲与格式特征 |
 | `POST` | `/enhance` | 高级视图的手动增强，`text/event-stream`（`meta`/`status`/`delta`/`done`/`error`）；请求体可带 `depth` |
-| `POST` | `/candidates` | 自动模式：先识别意图再流式返回三条路线候选，`text/event-stream`（`meta`/`status`/`delta`/`slot-done`/`slot-error`/`done`） |
+| `POST` | `/candidates` | 自动模式：先识别意图再流式返回两条路线候选，`text/event-stream`（`meta`/`status`/`delta`/`slot-done`/`slot-error`/`done`） |
 | `POST` | `/cancel` | 中止在途增强 |
 | `POST` | `/presence` | 浏览器诊断面包屑（只读效果，不影响增强） |
 
@@ -544,15 +551,15 @@ README 里的图在 `docs/images/`：四张界面示意 PNG 由 `generate-mockup
   `.docx`、`.pdf` 不解析 —— 需要先转成文本，或改用「按类型起草」。
 - 文档补写以原文节选为限（默认 ≤ 16000 字）；超长文档只覆盖前部，摘要里会标注「已截断」。
 - 增强质量取决于所选模型的推理能力；推理型模型首字节 7–28 秒属正常，可用「停止」中止。
-- 自动模式要跑一次意图识别 + 三条路线生成，总时长约为单次增强的三倍；三条路线都是同一模型的
+- 自动模式要跑一次意图识别 + 两条路线生成，总时长约为单次增强的两倍；两条路线都是同一模型的
   三次独立生成，风格差异取决于模型本身。意图识别失败会回落关键词启发式（界面会标注来源）。
-- 档位预算是指令不是硬约束：实测成稿约为预算的 1.3–1.5 倍（四家一致），档位之间的相对差异稳定，
-  但别指望「简洁」一定落在 1428 字以内。
+- 档位预算是指令不是硬约束（仅高级视图）：实测成稿约为预算的 1.3–1.5 倍（四家一致），档位之间的
+  相对差异稳定，但别指望「简洁」一定落在 1428 字以内。自动视图没有预算，篇幅由任务与模型共同决定。
 - 还没有 `sessionId` 的空白页没有输入控件行，此时不渲染按钮；进入任一已有会话即可。
 - 窗口窄于约 600px 时，面板宽 384px 无法在按钮旁放下，会盖住自己的 ✨ 按钮（✕ 与点击外部仍可关闭）。
 - 只在 DSH Web GUI 验证过；Electron IPC 形态未测。
 - 未合并上游项目的提示词原文：LangGPT 许可徽章与 API 冲突、Prompt Optimizer 非 OSI 许可，
-  因此只取手法、自行重写；prompts.chat 为 CC BY-NC，同样只提炼手法不引原文。
+  因此只取手法、自行重写；prompt-optimizer-skill 虽是 MIT，也只借鉴其中「原话为准」的规则。
 
 ## 上游与致谢
 
@@ -563,8 +570,9 @@ README 里的图在 `docs/images/`：四张界面示意 PNG 由 `generate-mockup
 - [langgptai/LangGPT](https://github.com/langgptai/LangGPT)（Apache-2.0 / README 徽章写 MIT，冲突已记录）
 - [rockbenben/ChatGPT-Shortcut](https://github.com/rockbenben/ChatGPT-Shortcut)（MIT 代码）
 
-自动模式的角色手法源自 [f/prompts.chat](https://github.com/f/prompts.chat) 的 act 卡片
-（CC BY-NC 系列）——只提炼手法并自行重写，不复制任何卡片原文。
+自动模式「简洁优化」路线的手法源自
+[Samuel-Shek/prompt-optimizer-skill](https://github.com/Samuel-Shek/prompt-optimizer-skill)（MIT）：
+只借鉴它「原话为准、只加不改」的规则，提示词文本由本项目自行改写，不复制其原文。
 
 许可细节与「没有复制任何上游文本」的说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 

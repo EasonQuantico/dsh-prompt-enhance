@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Open a private report through GitHub Security Advisories
-(<https://github.com/EasonQuantico/dsh-prompt-enhance/security/advisories/new>) or email
+(<https://github.com/EasonQuantico/dsh-prompt-enhance-ultra/security/advisories/new>) or email
 the maintainer. Please do not open a public issue for a vulnerability that lets a
 web page read your workspace or spend your model quota. Expect an initial reply within a
 week.
@@ -11,7 +11,7 @@ week.
 ## Threat model
 
 The plugin runs inside your local DSH installation and adds an HTTP surface under
-`/prompt-enhance/api`. The relevant attackers are therefore:
+`/prompt-enhance-ultra/api`. The relevant attackers are therefore:
 
 1. **A web page you visit while DSH is running** (drive-by cross-origin `fetch`).
 2. **A malicious file inside your workspace** trying to steer the model that reads it.

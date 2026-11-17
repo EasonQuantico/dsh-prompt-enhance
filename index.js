@@ -1,8 +1,8 @@
 /**
- * dsh-prompt-enhance — host half.
+ * dsh-prompt-enhance-ultra — host half.
  *
- * Mounted by the bundle patch row `prompt-enhance`. Registers a small JSON/SSE API
- * under `/prompt-enhance/api` that the browser half (`client.js`) calls from the
+ * Mounted by the bundle patch row `prompt-enhance-ultra`. Registers a small JSON/SSE API
+ * under `/prompt-enhance-ultra/api` that the browser half (`client.js`) calls from the
  * composer dock. The API is *outside* the harness `/api/*` auth middleware, so every
  * request is gated by loopback + same-origin + JSON content-type checks.
  */
@@ -23,18 +23,15 @@ import {
   methodologyById,
   methodologyCatalogue,
   selectMethodology,
-  selectAct,
-  actById,
   variantForIntent,
-  ACT_ROLES,
   AUTO_ROUTES,
 } from './strategies.js'
 
-export const VERSION = '1.5.0'
+export const VERSION = '1.6.0'
 /** `llm` is required for the enhance route; `webServer` is injected locally below. */
 export const inject = ['llm']
-const ROUTE_PREFIX = '/prompt-enhance/api'
-const PLUGIN_ID = 'prompt-enhance'
+const ROUTE_PREFIX = '/prompt-enhance-ultra/api'
+const PLUGIN_ID = 'prompt-enhance-ultra'
 
 const DEFAULTS = {
   workspaceRoot: '',
@@ -49,7 +46,10 @@ const DEFAULTS = {
   maxListedDocuments: 800,
   maxDocumentChars: 16000,
   maxOutputTokens: 8000,
-  requestTimeoutMs: 180000,
+  // Per LLM call (intent pass, one /enhance run, ONE /candidates slot). The
+  // whole run only ends when every step of it had its own timeout.
+  callTimeoutMs: 120000,
+  requestTimeoutMs: 420000,
 }
 
 const IGNORED_DIRS = new Set([
@@ -698,6 +698,7 @@ export function apply(ctx, rawConfig = {}) {
     'maxListedDocuments',
     'maxDocumentChars',
     'maxOutputTokens',
+    'callTimeoutMs',
     'requestTimeoutMs',
   ]) {
     const numeric = Number(config[key])
@@ -760,7 +761,7 @@ export function apply(ctx, rawConfig = {}) {
       return sendError(response, 404, 'not-found', `未知端点：${path}`)
     } catch (error) {
       const status = error && error.status ? error.status : 500
-      if (status >= 500) ctx.logger?.warn?.('prompt-enhance: request failed', error)
+      if (status >= 500) ctx.logger?.warn?.('prompt-enhance-ultra: request failed', error)
       if (!response.headersSent) return sendError(response, status, 'internal-error', error?.message || '内部错误')
       try {
         response.end()
@@ -774,7 +775,7 @@ export function apply(ctx, rawConfig = {}) {
   ctx.inject(['webServer'], (webCtx) => {
     webCtx.effect(() => {
       const dispose = webCtx.webServer.register({ kind: 'prefix', path: ROUTE_PREFIX, handler: handle })
-      ctx.logger?.info?.(`prompt-enhance: mounted ${ROUTE_PREFIX} (v${VERSION})`)
+      ctx.logger?.info?.(`prompt-enhance-ultra: mounted ${ROUTE_PREFIX} (v${VERSION})`)
       return () => {
         try {
           dispose?.()
@@ -783,7 +784,7 @@ export function apply(ctx, rawConfig = {}) {
           // second throw here would mask that and abort the remaining effects.
         }
       }
-    }, 'prompt-enhance: http routes')
+    }, 'prompt-enhance-ultra: http routes')
   })
 }
 
@@ -816,7 +817,6 @@ async function handleState(ctx, state, response) {
     focuses: FOCUSES,
     depths: DEPTHS,
     methodologies: methodologyCatalogue(),
-    acts: ACT_ROLES.map(({ id, zh, en, applies }) => ({ id, zh, en, applies })),
     routes: AUTO_ROUTES,
     client: { beats: state.presence.length, recent: state.presence.slice(-6) },
   })
@@ -1151,7 +1151,8 @@ function parseIntent(text) {
 
 /**
  * POST /candidates — the automatic mode: recognize the draft's intent, then
- * stream three candidate rewrites (methodology / act / structure routes), each
+ * stream two candidate rewrites (a concise "your own words" pass and the
+ * best-fitting methodology), each
  * tagged with its source so the client can show provenance.
  */
 async function handleCandidates(ctx, state, request, response) {
@@ -1163,9 +1164,6 @@ async function handleCandidates(ctx, state, request, response) {
   if (prompt.length > config.maxPromptChars) {
     return sendError(response, 413, 'prompt-too-long', `提示词过长（上限 ${config.maxPromptChars} 字符）`)
   }
-
-  const depth = body.depth === undefined || body.depth === null || body.depth === '' ? 'default' : String(body.depth)
-  if (!DEPTH_IDS.includes(depth)) return sendError(response, 400, 'bad-depth', `depth 必须是 ${DEPTH_IDS.join('、')} 或省略`)
 
   const route = await resolveRoute(ctx, config)
   if (!route) return sendError(response, 503, 'no-model', '当前没有可用的模型路由，请先在设置中选择默认模型')
@@ -1193,16 +1191,19 @@ async function handleCandidates(ctx, state, request, response) {
   })
   job.cancel = () => {
     job.closed = true
+    if (runDeadlineRef.value) clearTimeout(runDeadlineRef.value)
   }
 
   const startedAt = Date.now()
+  // Mutable handle so `job.cancel` can clear the whole-run deadline even
+  // though it is declared before the deadline itself.
+  const runDeadlineRef = { value: null }
 
   emit('meta', {
     provider: route.provider,
     model: route.model,
     modelSource: route.source,
     promptChars: prompt.length,
-    depth,
     routes: AUTO_ROUTES.map((entry) => entry.id),
     stage: 'intent',
     startedAt,
@@ -1227,11 +1228,19 @@ async function handleCandidates(ctx, state, request, response) {
   let recognized = null
   let intentRaw = ''
   let intentFailure = ''
+  // One deadline per LLM call, plus a whole-run deadline that covers the
+  // intent pass and every slot. Only the current step fails on its own
+  // timeout; the run-level deadline is what may stop everything.
   const intentTimeout = setTimeout(() => {
-    job.closed = true
-    intentFailure = '意图识别超时'
-  }, 30000)
+    intentFailure = `意图识别超时（>${Math.round(config.callTimeoutMs / 1000)}s）`
+  }, config.callTimeoutMs)
   if (typeof intentTimeout.unref === 'function') intentTimeout.unref()
+  const runDeadline = setTimeout(() => {
+    job.closed = true
+    intentFailure = intentFailure || `整体超时（>${Math.round(config.requestTimeoutMs / 1000)}s）`
+  }, config.requestTimeoutMs)
+  if (typeof runDeadline.unref === 'function') runDeadline.unref()
+  runDeadlineRef.value = runDeadline
 
   try {
     const stream = ctx.llm.stream({ provider: route.provider, model: route.model, messages: intentMessages, maxTokens: 400 })
@@ -1248,53 +1257,39 @@ async function handleCandidates(ctx, state, request, response) {
     clearTimeout(intentTimeout)
   }
 
-  if (intentFailure && !job.closed) {
-    emit('error', { code: 'upstream-failed', message: intentFailure })
-    closeStream()
-    return
-  }
+  // A failed intent pass must not kill the run: fall back to the heuristic
+  // classifier and keep going. Only the run-level deadline stops everything.
+  if (intentFailure && !job.closed) emit('status', { stage: 'intent', degraded: intentFailure })
 
   recognized = parseIntent(intentRaw) || { intent: heuristicIntent(prompt), summary: '', keywords: [] }
   const intent = recognized.intent
   emit('status', { stage: 'intent', intent, summary: recognized.summary, keywords: recognized.keywords, source: parseIntent(intentRaw) ? 'model' : 'heuristic' })
 
-  /* --- step 2: plan the three candidates --------------------------------- */
+  /* --- step 2: plan the two candidates ----------------------------------- */
 
   const modeForIntent = intent === 'creative' ? 'creative' : intent === 'doc' ? 'doc' : 'code'
   const variant = variantForIntent(intent)
   const choice = selectMethodology({ mode: modeForIntent, variant, prompt, requested: 'auto' })
   const ranked = Array.isArray(choice.ranked) && choice.ranked.length ? choice.ranked : [choice.id, 'langgpt', 'prompt-optimizer', 'aishort'].filter((id) => methodologyById(id))
   const primaryId = ranked[0]
-  const secondaryId = ranked[1] || ranked[0]
-  const act = selectAct({ intent, prompt })
+  const primary = methodologyById(primaryId)
 
   const plan = [
     {
       slot: 0,
-      routeId: 'methodology',
-      methodology: methodologyById(primaryId),
-      act: null,
-      labelZh: methodologyById(primaryId) ? methodologyById(primaryId).label : primaryId,
-      labelEn: primaryId,
-      reason: choice.reason,
+      routeId: 'concise',
+      methodology: null,
+      labelZh: '简洁优化',
+      labelEn: 'Concise',
+      reason: '以你的原话为准，直接给出一份完整提示词',
     },
     {
       slot: 1,
-      routeId: 'act',
-      methodology: methodologyById(secondaryId),
-      act,
-      labelZh: act.zh,
-      labelEn: act.en,
-      reason: `识别为${intent === 'code' ? '代码' : intent === 'creative' ? '创作' : '文档'}类，${act.zh} 的手法与需求最贴合`,
-    },
-    {
-      slot: 2,
-      routeId: 'structure',
-      methodology: methodologyById(secondaryId),
-      act: null,
-      labelZh: methodologyById(secondaryId) ? methodologyById(secondaryId).label : secondaryId,
-      labelEn: secondaryId,
-      reason: `同一识别结果下换一种结构化手法（${methodologyById(secondaryId) ? methodologyById(secondaryId).label : secondaryId}）`,
+      routeId: 'methodology',
+      methodology: primary,
+      labelZh: primary ? primary.label : primaryId,
+      labelEn: primaryId,
+      reason: choice.reason,
     },
   ]
 
@@ -1316,8 +1311,6 @@ async function handleCandidates(ctx, state, request, response) {
       intent,
       route: entry.routeId,
       methodology: entry.methodology,
-      act: entry.act,
-      depth,
     })
     const messages = [
       {
@@ -1333,10 +1326,12 @@ async function handleCandidates(ctx, state, request, response) {
     let reasoningChars = 0
     let lastStatusAt = 0
     let announcedText = false
+    // Slot-level timeout: a slow route must only fail ITS OWN candidate and
+    // let the remaining routes continue (this was the "page goes dead" bug —
+    // the old code set job.closed here, which silently killed the run).
     const slotTimeout = setTimeout(() => {
-      job.closed = true
-      failure = `生成超时（>${Math.round(config.requestTimeoutMs / 1000)}s）`
-    }, config.requestTimeoutMs)
+      failure = `该路线生成超时（>${Math.round(config.callTimeoutMs / 1000)}s）`
+    }, config.callTimeoutMs)
     if (typeof slotTimeout.unref === 'function') slotTimeout.unref()
 
     try {
@@ -1400,6 +1395,7 @@ async function handleCandidates(ctx, state, request, response) {
   }
 
   const completed = slots.filter((item) => item.text)
+  clearTimeout(runDeadline)
   if (job.closed && !completed.length) {
     closeStream()
     return
@@ -1410,7 +1406,7 @@ async function handleCandidates(ctx, state, request, response) {
     return
   }
   if (!completed.length) {
-    emit('error', { code: 'empty-result', message: '三条路线都没有返回内容，请重试' })
+    emit('error', { code: 'empty-result', message: '两组候选都没有返回内容，请重试' })
     closeStream()
     return
   }
@@ -1418,7 +1414,6 @@ async function handleCandidates(ctx, state, request, response) {
   emit('done', {
     intent,
     intentSummary: recognized.summary,
-    depth,
     slots: completed,
     durationMs: Date.now() - startedAt,
   })

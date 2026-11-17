@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Prompt Enhancement",
-    "description": "Enhance the composer prompt: code mode (workspace-aware, framework + security review) and creative mode (enrich or structure), with adaptive prompt-engineering methodologies."
+    "description": "Enhance the composer prompt: the automatic mode returns a concise pass and the best-fit methodology; the advanced mode covers code (workspace-aware / prompt-only), creative (enrich / tighten the structure) and documentation (fill in an existing document / draft from a type), with three length levels."
   }
 }
